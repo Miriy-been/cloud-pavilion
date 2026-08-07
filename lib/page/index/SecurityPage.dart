@@ -6,6 +6,7 @@ import 'package:cloudpavilion/api/SecurityApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/util/FingerprintService.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
 import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
@@ -80,6 +81,7 @@ class _SecurityPageState extends State<SecurityPage> {
       TokenAutoRefresh.instance.stop();
       TokenManager.clear();
       SpUtils.setBool('isLogin', false);
+      AuthState.isLoggedIn.value = false;
       FileApi.clearAllCache();
       final siteUrl = await SpUtils.getString('CurrentBaseUrl');
       final userName = await SpUtils.getString('currentUserName');

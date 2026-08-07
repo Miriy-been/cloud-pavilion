@@ -6,6 +6,7 @@ import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/exception/DebugReportException.dart';
 import 'package:cloudpavilion/page/login/users.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/util/DownloadManager.dart';
 import 'package:cloudpavilion/util/FingerprintService.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
@@ -444,6 +445,7 @@ class _LoginState extends State<Login> {
     SpUtils.setStringList('accounts', accountList);
     SpUtils.setString('userInfo', json.encode(userInfo));
     SpUtils.setBool("isLogin", true);
+    AuthState.isLoggedIn.value = true;
     SpUtils.setString('currentMenu', 'cloudreve://my');
     SpUtils.setString('folderStack', '');
     // 加载该账号的任务记录（下载/上传/后台任务按账号隔离）

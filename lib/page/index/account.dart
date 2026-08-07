@@ -14,6 +14,7 @@ import 'package:cloudpavilion/page/index/shares.dart';
 import 'package:cloudpavilion/page/login/users.dart';
 import 'package:cloudpavilion/util/AppCache.dart';
 import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/util/DownloadManager.dart';
 import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
 import 'package:cloudpavilion/util/TokenManager.dart';
@@ -633,6 +634,7 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
     // 切换登录状态
     TokenManager.clear();
     SpUtils.setBool("isLogin", false);
+    AuthState.isLoggedIn.value = false;
     // 跳转路由
     Navigator.pushNamedAndRemoveUntil(
         context, "/home", (route) => false);

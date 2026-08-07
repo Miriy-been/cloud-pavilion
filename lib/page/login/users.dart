@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
 import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
 import 'package:cloudpavilion/util/TokenManager.dart';
@@ -245,6 +246,7 @@ class _UsersState extends State<Users> {
     await SpUtils.setString('currentUserName', data['userName']);
     await SpUtils.setString('userInfo', json.encode(data));
     await SpUtils.setBool('isLogin', true);
+    AuthState.isLoggedIn.value = true;
     await SpUtils.setString('currentMenu', FileApi.myRootUri);
     await SpUtils.setString('folderStack', '');
     // 加载该账号的任务记录（下载/上传/后台任务按账号隔离）

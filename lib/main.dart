@@ -12,6 +12,7 @@ import 'package:cloudpavilion/util/WorkflowTaskManager.dart';
 import 'package:flutter_smart_dialog/src/init_dialog.dart';
 import 'package:cloudpavilion/page/tools/customToast.dart';
 import 'package:cloudpavilion/util/AppCache.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/page/login/login.dart';
 import 'package:cloudpavilion/page/login/users.dart';
 import 'package:cloudpavilion/handler/AppExceptionHandle.dart';
@@ -30,6 +31,8 @@ void main() async {
     ),
   )) as ReveAudioHandler;
   var isLogin = await SpUtils.getBool("isLogin");
+  // 同步初始登录态到全局守卫（未登录进登录页，已登录进主界面）
+  AuthState.isLoggedIn.value = isLogin;
   // 缓存超阈值自动淘汰最旧文件（后台执行，不阻塞启动）
   AppCache.evictIfOverflow();
   // 恢复本地持久化的上传 / 下载任务记录
@@ -99,7 +102,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       themeMode: _mode,
       initialRoute: widget.isLogin ? "/" : "/home",
       routes: {
-        "/": (context) => Bottom(),
+        // 根路由走登录态守卫：未登录时强制显示登录页
+        "/": (context) => const AuthGate(),
         "/login": (context) => Login(),
         "/home": (context) => Login(),
         "/users": (context) => Users(),
@@ -120,6 +124,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           value: overlay,
           child: smartBuilder(context, child),
         );
+      },
+    );
+  }
+}
+
+/// 根路由登录态守卫：登录时显示主界面（底部导航），未登录时显示登录页。
+///
+/// 监听 [AuthState.isLoggedIn]：token 刷新失败 / 登出 / 改密等任何导致
+/// 登录态丢失的路径，都会立即把主界面替换为登录页，
+/// 避免未登录仍停留在存储/分类等内部页面。
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: AuthState.isLoggedIn,
+      builder: (context, _) {
+        return AuthState.isLoggedIn.value ? Bottom() : Login();
       },
     );
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloudpavilion/exception/NotLoginException.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
 import './SpUtils.dart';
 import './TokenManager.dart';
 
@@ -139,6 +140,8 @@ class DioUtil {
       if (curUrl == reqUrl && curUser == reqUser) {
         await TokenManager.clear();
         await SpUtils.setBool('isLogin', false);
+        // 通知全局守卫切回登录页，避免未登录仍停留在内部页面
+        AuthState.isLoggedIn.value = false;
       }
       handler.next(error);
       return;
