@@ -38,6 +38,8 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
+    // 订阅主题：深浅色切换时重建登录页配色
+    Theme.of(context);
     return Scaffold(
       body: Column(
         children: [

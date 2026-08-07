@@ -422,6 +422,8 @@ class _PreviewPageState extends State<PreviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 订阅主题：深浅色切换时重建预览页配色
+    Theme.of(context);
     // 顶栏 / 操作栏作为浮层叠加在内容之上（沉浸时滑出），
     // 内容区始终占满屏幕，避免收起控制栏时图片发生位移
     return Scaffold(

@@ -92,6 +92,8 @@ class _IndexState extends State<Index>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // 订阅主题：深浅色切换时重建页面与文件图标配色
+    Theme.of(context);
     return PopScope(
       canPop: !selectionMode && _folderStack.isEmpty,
       onPopInvokedWithResult: (didPop, result) {

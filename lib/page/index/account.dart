@@ -116,6 +116,8 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // 订阅主题：深浅色切换时重建页面
+    Theme.of(context);
     final data = _userInfo['data'] ?? {};
     final nickname = data['nickname']?.toString() ?? '';
     final avatar = data['avatar']?.toString() ?? '';

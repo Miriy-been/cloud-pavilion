@@ -32,6 +32,8 @@ class _DownloadState extends State<Download>
 
   @override
   Widget build(BuildContext context) {
+    // 订阅主题：深浅色切换时重建页面与任务行图标配色
+    Theme.of(context);
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Column(
@@ -96,6 +98,7 @@ class _DownloadTabState extends State<_DownloadTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    Theme.of(context);
     return ListenableBuilder(
       listenable: DownloadManager.instance,
       builder: (context, _) {
@@ -144,6 +147,7 @@ class _UploadTabState extends State<_UploadTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    Theme.of(context);
     return ListenableBuilder(
       listenable: UploadManager.instance,
       builder: (context, _) {

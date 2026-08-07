@@ -134,6 +134,8 @@ class _SecurityPageState extends State<SecurityPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 订阅主题：深浅色切换时重建页面
+    Theme.of(context);
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Column(
