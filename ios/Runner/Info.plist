@@ -2,9 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- 放行 HTTP 明文站点（App 支持用户任意 Cloudreve 站点，含 HTTP） -->
     <key>NSAppTransportSecurity</key>
-    <key>NSAllowsArbitraryLoads</key>
-	<key>CFBundleDevelopmentRegion</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+    <!-- 指纹/面容登录（local_auth 必需，缺失会导致调用时崩溃） -->
+    <key>NSFaceIDUsageDescription</key>
+    <string>用于指纹/面容快捷登录</string>
+    <key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>FlutterReve</string>
