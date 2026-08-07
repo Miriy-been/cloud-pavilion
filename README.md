@@ -76,8 +76,7 @@ APK 输出于 `build/app/outputs/flutter-apk/`。
 
 ## 更新与发布
 
-新版本通过 GitHub Releases 分发：修改 `pubspec.yaml` 中的 `version`，构建 APK 后
-上传到 Release（tag 形如 `v1.1.0`，更新说明写在 release body），客户端会自动弹出更新提示。
+新版本通过 GitHub Releases 分发，用户可直接从 Releases 页面下载最新版本的 APK 文件。
 
 ## 已知限制
 
