@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/enums/FileType.dart';
-import 'package:flutter_application_2/model/FileItemModel.dart';
-import 'package:flutter_application_2/util/AppCache.dart';
-import 'package:flutter_application_2/util/ReveAudioHandler.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/enums/FileType.dart';
+import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/util/AppCache.dart';
+import 'package:cloudpavilion/util/ReveAudioHandler.dart';
 import 'package:just_audio/just_audio.dart';
 
 /// 全局音频播放服务（单例）
@@ -288,6 +288,8 @@ class AudioPlayerService extends ChangeNotifier {
     currentArtist = null;
     currentAlbum = null;
     currentCover = null;
+    // 清空通知栏队列与当前曲目，避免系统媒体面板残留旧歌曲且仍可播放
+    ReveAudioHandler.instance?.clear();
     _evictCacheIfNeeded();
     notifyListeners();
   }
@@ -376,17 +378,19 @@ class AudioPlayerService extends ChangeNotifier {
             md = raw
                 .map((k, v) => MapEntry(k.toString(), v.toString()));
             playlist[index] = FileItemModel(
-                type: f.type,
-                id: f.id,
-                name: f.name,
-                size: f.size,
-                path: f.path,
-                createdAt: f.createdAt,
-                updatedAt: f.updatedAt,
-                metadata: md);
-          }
-        } catch (_) {}
-      }
+              type: f.type,
+              id: f.id,
+              name: f.name,
+              size: f.size,
+              path: f.path,
+              createdAt: f.createdAt,
+              updatedAt: f.updatedAt,
+              metadata: md);
+        }
+      } catch (_) {}
+    }
+      // 切歌后丢弃旧曲目的元数据结果，避免覆盖当前曲目显示
+      if (index != currentIndex) return;
       currentTitle = md?['music:title'] ?? f.name;
       currentArtist = md?['music:artist'];
       currentAlbum = md?['music:album'];

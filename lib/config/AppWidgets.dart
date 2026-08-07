@@ -271,6 +271,11 @@ class _CachedImageState extends State<CachedImage> {
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
+        // 懒解码：按显示尺寸 × 像素比 降采样解码，
+        // 避免缩略图/封面按原图全尺寸解码导致的内存峰值
+        cacheWidth: widget.width != null
+            ? (widget.width! * MediaQuery.devicePixelRatioOf(context)).round()
+            : null,
         errorBuilder: (_, __, ___) => widget.errorBuilder?.call(context, '')
             ?? widget.placeholder,
       );

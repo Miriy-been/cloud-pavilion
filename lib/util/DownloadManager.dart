@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/model/DownloadTaskModel.dart';
+import 'package:cloudpavilion/model/DownloadTaskModel.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'ErrorText.dart';
@@ -16,8 +16,17 @@ class DownloadManager extends ChangeNotifier {
   DownloadManager._();
   static final DownloadManager instance = DownloadManager._();
 
-  /// 任务记录本地持久化 key
+  /// 任务记录本地持久化 key 前缀（按账号隔离，站点+用户名 维度）
   static const _kTasksKey = 'downloadTasks';
+
+  /// 当前账号的任务持久化 key
+  Future<String> _tasksKey() async {
+    final siteUrl = await SpUtils.getString('CurrentBaseUrl');
+    final userName = await SpUtils.getString('currentUserName');
+    return siteUrl.isEmpty || userName.isEmpty
+        ? _kTasksKey
+        : '${_kTasksKey}_$siteUrl|$userName';
+  }
 
   final List<DownloadTaskModel> tasks = [];
   final Dio _dio = Dio();
@@ -46,9 +55,9 @@ class DownloadManager extends ChangeNotifier {
     }
   }
 
-  /// 恢复历史任务记录（应用启动时调用）
+  /// 恢复历史任务记录（应用启动 / 切换账号时调用）
   Future<void> restore() async {
-    final raw = await SpUtils.getString(_kTasksKey);
+    final raw = await SpUtils.getString(await _tasksKey());
     if (raw.isEmpty) return;
     try {
       final list = jsonDecode(raw) as List<dynamic>;
@@ -87,8 +96,23 @@ class DownloadManager extends ChangeNotifier {
 
   /// 持久化全部任务记录
   Future<void> _persist() async {
-    await SpUtils.setString(
-        _kTasksKey, jsonEncode(tasks.map((t) => t.toJson()).toList()));
+    await SpUtils.setString(await _tasksKey(),
+        jsonEncode(tasks.map((t) => t.toJson()).toList()));
+  }
+
+  /// 切换账号：停止旧账号进行中的任务并加载新账号的任务记录。
+  /// 必须在当前账号上下文（CurrentBaseUrl / currentUserName）已更新后调用；
+  /// 停止任务时不触发持久化，避免旧账号任务写入新账号的 key
+  Future<void> switchAccount() async {
+    for (final t in List.of(tasks)) {
+      if (t.status == DownloadStatus.downloading) {
+        t.status = DownloadStatus.cancelled;
+        _tokens.remove(t)?.cancel();
+      }
+    }
+    tasks.clear();
+    notifyListeners();
+    await restore();
   }
 
   /// 应用专属下载目录：/storage/emulated/0/cloudreve（自动创建，Android 11+ 需授权）
@@ -119,7 +143,7 @@ class DownloadManager extends ChangeNotifier {
   /// 开始下载（url 为签名临时直链，无需认证头）
   Future<void> startDownload(String name, String url) async {
     final systemDownloads =
-        await SpUtils.getString('downloadDirMode', 'app') == 'system';
+        await SpUtils.getString('downloadDirMode', 'system') == 'system';
     final task = DownloadTaskModel(
       name: name,
       savePath: '',

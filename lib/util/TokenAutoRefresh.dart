@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter_application_2/util/DioUtil.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
-import 'package:flutter_application_2/util/TokenManager.dart';
+import 'package:cloudpavilion/util/DioUtil.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/TokenManager.dart';
 
 /// Token 定时自动刷新（全局单例）
 /// 周期性检查 access / refresh token 的过期状态，临近过期时主动调用刷新接口续期。

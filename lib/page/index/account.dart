@@ -2,20 +2,23 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/api/UserApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/config/ThemeController.dart';
-import 'package:flutter_application_2/config/SlideUpPageRoute.dart';
-import 'package:flutter_application_2/enums/FileType.dart';
-import 'package:flutter_application_2/page/index/SecurityPage.dart';
-import 'package:flutter_application_2/page/index/shares.dart';
-import 'package:flutter_application_2/page/login/users.dart';
-import 'package:flutter_application_2/util/AppCache.dart';
-import 'package:flutter_application_2/util/AudioPlayerService.dart';
-import 'package:flutter_application_2/util/TokenAutoRefresh.dart';
-import 'package:flutter_application_2/util/TokenManager.dart';
-import 'package:flutter_application_2/util/UpdateChecker.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/api/UserApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/config/ThemeController.dart';
+import 'package:cloudpavilion/config/SlideUpPageRoute.dart';
+import 'package:cloudpavilion/enums/FileType.dart';
+import 'package:cloudpavilion/page/index/SecurityPage.dart';
+import 'package:cloudpavilion/page/index/shares.dart';
+import 'package:cloudpavilion/page/login/users.dart';
+import 'package:cloudpavilion/util/AppCache.dart';
+import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
+import 'package:cloudpavilion/util/TokenManager.dart';
+import 'package:cloudpavilion/util/UpdateChecker.dart';
+import 'package:cloudpavilion/util/UploadManager.dart';
 import 'package:intl/intl.dart';
 import '../../util/SpUtils.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -98,7 +101,7 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
 
   /// 恢复下载路径模式
   Future<void> _loadDownloadMode() async {
-    final mode = await SpUtils.getString('downloadDirMode', 'app');
+    final mode = await SpUtils.getString('downloadDirMode', 'system');
     if (mounted && mode != _downloadMode) {
       setState(() => _downloadMode = mode);
     }
@@ -618,6 +621,15 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
     AudioPlayerService.instance.stop();
     // 停止 token 定时自动刷新
     TokenAutoRefresh.instance.stop();
+    // 停止所有进行中的上传/下载任务（与提示语「任务会停止」一致）
+    for (final t in List.of(DownloadManager.instance.tasks)) {
+      DownloadManager.instance.cancel(t);
+    }
+    for (final t in List.of(UploadManager.instance.tasks)) {
+      UploadManager.instance.cancel(t);
+    }
+    // 清空文件列表/直链/元数据缓存，避免登出后残留旧账号数据
+    FileApi.clearAllCache();
     // 切换登录状态
     TokenManager.clear();
     SpUtils.setBool("isLogin", false);

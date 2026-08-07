@@ -1,4 +1,4 @@
-import 'package:flutter_application_2/util/DioUtil.dart';
+import 'package:cloudpavilion/util/DioUtil.dart';
 
 /// 账号安全相关 API（重设密码），对齐 Cloudreve V4 后端
 class SecurityApi {

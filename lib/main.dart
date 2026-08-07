@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/ThemeController.dart';
-import 'package:flutter_application_2/page/index/bottomBar.dart';
-import 'package:flutter_application_2/util/DownloadManager.dart';
-import 'package:flutter_application_2/util/ReveAudioHandler.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
-import 'package:flutter_application_2/util/TokenAutoRefresh.dart';
-import 'package:flutter_application_2/util/UploadManager.dart';
-import 'package:flutter_application_2/util/WorkflowTaskManager.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/ThemeController.dart';
+import 'package:cloudpavilion/page/index/bottomBar.dart';
+import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/ReveAudioHandler.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
+import 'package:cloudpavilion/util/UploadManager.dart';
+import 'package:cloudpavilion/util/WorkflowTaskManager.dart';
 import 'package:flutter_smart_dialog/src/init_dialog.dart';
-import 'package:flutter_application_2/page/tools/customToast.dart';
-import 'package:flutter_application_2/util/AppCache.dart';
-import 'package:flutter_application_2/page/login/login.dart';
-import 'package:flutter_application_2/page/login/users.dart';
-import 'package:flutter_application_2/handler/AppExceptionHandle.dart';
+import 'package:cloudpavilion/page/tools/customToast.dart';
+import 'package:cloudpavilion/util/AppCache.dart';
+import 'package:cloudpavilion/page/login/login.dart';
+import 'package:cloudpavilion/page/login/users.dart';
+import 'package:cloudpavilion/handler/AppExceptionHandle.dart';
 import 'package:audio_service/audio_service.dart';
 
 void main() async {
@@ -24,7 +24,7 @@ void main() async {
   ReveAudioHandler.instance = (await AudioService.init(
     builder: () => ReveAudioHandler(),
     config: AudioServiceConfig(
-      androidNotificationChannelId: 'com.example.flutter_application_2.audio',
+      androidNotificationChannelId: 'com.cloudpavilion.app.audio',
       androidNotificationChannelName: '音乐播放',
       androidNotificationOngoing: true,
     ),

@@ -1,4 +1,4 @@
-package com.example.flutter_application_2
+package com.cloudpavilion.app
 
 import android.content.ContentValues
 import android.content.Context

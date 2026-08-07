@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/model/FileItemModel.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/model/FileItemModel.dart';
 
 /// 移动/复制选择结果
 class MovePickResult {

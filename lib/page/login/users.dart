@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
-import 'package:flutter_application_2/util/TokenAutoRefresh.dart';
-import 'package:flutter_application_2/util/TokenManager.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
+import 'package:cloudpavilion/util/TokenManager.dart';
+import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/UploadManager.dart';
+import 'package:cloudpavilion/util/WorkflowTaskManager.dart';
 import 'package:flutter_smart_dialog/src/smart_dialog.dart';
 import 'dart:convert';
 
@@ -46,7 +49,6 @@ class _UsersState extends State<Users> {
                 onTap: () => Navigator.pop(context),
               ),
               actions: [
-                IconTile(icon: Icons.qr_code_scanner, onTap: () {}),
                 IconTile(
                   icon: Icons.add,
                   onTap: () => Navigator.pushNamed(context, "/home"),
@@ -245,6 +247,10 @@ class _UsersState extends State<Users> {
     await SpUtils.setBool('isLogin', true);
     await SpUtils.setString('currentMenu', FileApi.myRootUri);
     await SpUtils.setString('folderStack', '');
+    // 加载该账号的任务记录（下载/上传/后台任务按账号隔离）
+    await DownloadManager.instance.switchAccount();
+    await UploadManager.instance.switchAccount();
+    await WorkflowTaskManager.instance.switchAccount();
     // 切换账号后启动 token 定时自动刷新
     TokenAutoRefresh.instance.start();
     Navigator.pushNamedAndRemoveUntil(context, "/", (route) => false);

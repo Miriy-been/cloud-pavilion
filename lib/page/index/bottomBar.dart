@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/page/index/account.dart';
-import 'package:flutter_application_2/page/index/category.dart';
-import 'package:flutter_application_2/page/index/download.dart';
-import 'package:flutter_application_2/page/index/index.dart';
-import 'package:flutter_application_2/util/UpdateChecker.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/page/index/account.dart';
+import 'package:cloudpavilion/page/index/category.dart';
+import 'package:cloudpavilion/page/index/download.dart';
+import 'package:cloudpavilion/page/index/index.dart';
+import 'package:cloudpavilion/util/UpdateChecker.dart';
 
 /// 底部通栏导航：纯白底色，选中态柔和浅蓝圆角按钮
 class Bottom extends StatefulWidget {

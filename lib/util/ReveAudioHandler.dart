@@ -68,6 +68,15 @@ class ReveAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     _broadcastState();
   }
 
+  /// 停止/登出时清空通知栏队列与当前曲目，
+  /// 避免系统媒体面板残留旧歌曲且仍可播放
+  void clear() {
+    _playing = false;
+    queue.add([]);
+    mediaItem.add(null);
+    _broadcastState();
+  }
+
   /// 更新指定曲目的封面（缩略图异步加载完成后调用）
   void updateArtwork(int index, Uri? artUri) {
     final items = List.of(queue.value);

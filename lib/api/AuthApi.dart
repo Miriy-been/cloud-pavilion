@@ -1,4 +1,4 @@
-import 'package:flutter_application_2/util/DioUtil.dart';
+import 'package:cloudpavilion/util/DioUtil.dart';
 import 'package:dio/dio.dart';
 
 class AuthApi {

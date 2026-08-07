@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/api/WorkflowApi.dart';
-import 'package:flutter_application_2/page/tools/customToast.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/api/WorkflowApi.dart';
+import 'package:cloudpavilion/page/tools/customToast.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 /// 服务器端后台任务跟踪器（压缩 / 解压等，全局单例）
@@ -17,8 +17,17 @@ class WorkflowTaskManager extends ChangeNotifier {
   WorkflowTaskManager._();
   static final WorkflowTaskManager instance = WorkflowTaskManager._();
 
-  /// 跟踪中的任务记录持久化 key
+  /// 跟踪中的任务记录持久化 key 前缀（按账号隔离，站点+用户名 维度）
   static const _kTasksKey = 'workflowTasks';
+
+  /// 当前账号的任务持久化 key
+  Future<String> _tasksKey() async {
+    final siteUrl = await SpUtils.getString('CurrentBaseUrl');
+    final userName = await SpUtils.getString('currentUserName');
+    return siteUrl.isEmpty || userName.isEmpty
+        ? _kTasksKey
+        : '${_kTasksKey}_$siteUrl|$userName';
+  }
 
   /// 跟踪中的任务：taskId → 操作描述（如「压缩 archive.zip」）
   final Map<String, String> _tasks = {};
@@ -46,11 +55,11 @@ class WorkflowTaskManager extends ChangeNotifier {
     _schedulePoll(taskId, first: true);
   }
 
-  /// 恢复历史任务跟踪（应用启动时调用）
+  /// 恢复历史任务跟踪（应用启动 / 切换账号时调用）
   Future<void> restore() async {
     if (_restored) return;
     _restored = true;
-    final raw = await SpUtils.getString(_kTasksKey);
+    final raw = await SpUtils.getString(await _tasksKey());
     if (raw.isEmpty) return;
     try {
       final list = jsonDecode(raw) as List<dynamic>;
@@ -71,11 +80,26 @@ class WorkflowTaskManager extends ChangeNotifier {
     }
   }
 
-  void _persist() {
+  Future<void> _persist() async {
+    final key = await _tasksKey();
     final list = _tasks.entries
         .map((e) => {'id': e.key, 'desc': e.value})
         .toList();
-    SpUtils.setString(_kTasksKey, jsonEncode(list));
+    await SpUtils.setString(key, jsonEncode(list));
+  }
+
+  /// 切换账号：停止当前账号跟踪的任务并加载新账号的任务记录。
+  /// 必须在当前账号上下文（CurrentBaseUrl / currentUserName）已更新后调用
+  Future<void> switchAccount() async {
+    for (final id in _timers.keys.toList()) {
+      _timers[id]?.cancel();
+    }
+    _timers.clear();
+    _tasks.clear();
+    _missingCount.clear();
+    _restored = false;
+    notifyListeners();
+    await restore();
   }
 
   void _schedulePoll(String id, {bool first = false}) {

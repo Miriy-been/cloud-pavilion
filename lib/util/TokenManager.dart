@@ -1,4 +1,4 @@
-import 'package:flutter_application_2/util/SpUtils.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
 
 /// 当前登录账号的 Token 管理（单账号上下文，多账号切换时整体覆盖）
 class TokenManager {

@@ -8,8 +8,9 @@ build/
 cloudreve源码/
 # Kotlin 编译错误日志
 android/.kotlin/
-# If you're building an application, you may want to check-in your pubspec.lock
-pubspec.lock
+# IntelliJ 模块文件（IDE 自动生成，无需提交）
+*.iml
+# Flutter 应用需提交 pubspec.lock（保证依赖可复现构建），不要忽略
 
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/api/ShareApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
+import 'package:cloudpavilion/api/ShareApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
 
 /// 我的分享列表页
 class SharesPage extends StatefulWidget {

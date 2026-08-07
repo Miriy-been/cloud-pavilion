@@ -1,15 +1,15 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/api/SecurityApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/util/AudioPlayerService.dart';
-import 'package:flutter_application_2/util/FingerprintService.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
-import 'package:flutter_application_2/util/TokenAutoRefresh.dart';
-import 'package:flutter_application_2/util/TokenManager.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/api/SecurityApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/FingerprintService.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
+import 'package:cloudpavilion/util/TokenManager.dart';
 
 /// 隐私和安全页
 /// - 密码管理：重设密码

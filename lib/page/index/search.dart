@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/enums/FileType.dart';
-import 'package:flutter_application_2/model/FileItemModel.dart';
-import 'package:flutter_application_2/page/preview/AudioPlayerPage.dart';
-import 'package:flutter_application_2/page/preview/PreviewPage.dart';
-import 'package:flutter_application_2/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/enums/FileType.dart';
+import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/page/preview/AudioPlayerPage.dart';
+import 'package:cloudpavilion/page/preview/PreviewPage.dart';
+import 'package:cloudpavilion/util/AudioPlayerService.dart';
 
 /// 文件搜索页（V4 list files 支持 name 查询条件）
 class SearchPage extends StatefulWidget {

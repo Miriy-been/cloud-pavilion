@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter_application_2/util/SpUtils.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 

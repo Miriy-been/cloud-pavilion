@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_application_2/exception/DebugReportException.dart';
-import 'package:flutter_application_2/util/DioUtil.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
-import 'package:flutter_application_2/util/TimeFlowDecoder.dart';
+import 'package:cloudpavilion/exception/DebugReportException.dart';
+import 'package:cloudpavilion/util/DioUtil.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/TimeFlowDecoder.dart';
 
 /// 文件相关 V4 API（URI 定位）
 class FileApi {
@@ -39,6 +39,8 @@ class FileApi {
     _urlCache.clear();
     _urlCacheExpiryAt.clear();
     _urlCacheLoaded = false;
+    // 重置落盘链，避免 pending 写把旧账号直链缓存写回
+    _urlCacheWriteChain = Future.value();
     SpUtils.remove(_urlCachePrefKey);
   }
 

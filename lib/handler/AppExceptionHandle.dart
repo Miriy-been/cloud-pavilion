@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_2/exception/NotLoginException.dart';
-import 'package:flutter_application_2/util/TokenManager.dart';
+import 'package:cloudpavilion/exception/NotLoginException.dart';
+import 'package:cloudpavilion/util/TokenManager.dart';
 import 'package:flutter_smart_dialog/src/smart_dialog.dart';
 import '../exception/DebugReportException.dart';
 import 'package:dio/dio.dart';

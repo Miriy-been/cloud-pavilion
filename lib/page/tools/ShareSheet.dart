@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
 
 /// 分享参数（有效期 / 访问密码 / 下载后自动过期）
 class ShareParams {

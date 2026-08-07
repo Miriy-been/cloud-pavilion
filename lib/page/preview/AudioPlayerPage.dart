@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/api/ShareApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/model/FileItemModel.dart';
-import 'package:flutter_application_2/util/AudioPlayerService.dart';
-import 'package:flutter_application_2/util/DownloadManager.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/api/ShareApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
 
 /// 音乐播放页：播放器 + 播放列表 + 多选管理
 /// 播放列表统一来自「全站音频库」（AudioPlayerService 维护），本页仅展示播放状态

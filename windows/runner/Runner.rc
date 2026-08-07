@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "flutter_application_2" "\0"
+            VALUE "CompanyName", "com.cloudpavilion.app" "\0"
+            VALUE "FileDescription", "cloudpavilion" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "flutter_application_2" "\0"
+            VALUE "InternalName", "cloudpavilion" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 Miriy-been. All rights reserved." "\0"
-            VALUE "OriginalFilename", "flutter_application_2.exe" "\0"
-            VALUE "ProductName", "flutter_application_2" "\0"
+            VALUE "OriginalFilename", "cloudpavilion.exe" "\0"
+            VALUE "ProductName", "cloudpavilion" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

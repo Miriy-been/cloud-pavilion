@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/model/DownloadTaskModel.dart';
-import 'package:flutter_application_2/model/UploadTaskModel.dart';
-import 'package:flutter_application_2/util/DownloadManager.dart';
-import 'package:flutter_application_2/util/UploadManager.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/model/DownloadTaskModel.dart';
+import 'package:cloudpavilion/model/UploadTaskModel.dart';
+import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/UploadManager.dart';
 
 /// 传输页（本地下载 + 后台上传任务）
 class Download extends StatefulWidget {

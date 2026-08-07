@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_2/exception/NotLoginException.dart';
+import 'package:cloudpavilion/exception/NotLoginException.dart';
 import './SpUtils.dart';
 import './TokenManager.dart';
 
@@ -125,17 +125,32 @@ class DioUtil {
   /// 刷新 token 后重放原请求
   Future<void> _retryWithRefresh(
       DioException error, ErrorInterceptorHandler handler) async {
+    // 记录发起刷新时的账号上下文；刷新期间若账号已切换（切号/改密/登出），
+    // 则丢弃刷新结果与重放，避免旧账号 token 污染新账号上下文
+    final reqUrl = await SpUtils.getString('CurrentBaseUrl');
+    final reqUser = await SpUtils.getString('currentUserName');
     try {
       _refreshing ??= _doRefresh();
       await _refreshing;
     } catch (e) {
-      // 刷新失败：清理登录态
-      await TokenManager.clear();
-      await SpUtils.setBool('isLogin', false);
+      // 刷新失败：仅当账号未变化时才清理登录态，避免误登出新账号
+      final curUrl = await SpUtils.getString('CurrentBaseUrl');
+      final curUser = await SpUtils.getString('currentUserName');
+      if (curUrl == reqUrl && curUser == reqUser) {
+        await TokenManager.clear();
+        await SpUtils.setBool('isLogin', false);
+      }
       handler.next(error);
       return;
     } finally {
       _refreshing = null;
+    }
+    // 账号已切换：原请求不属于当前上下文，丢弃重放
+    final curUrl = await SpUtils.getString('CurrentBaseUrl');
+    final curUser = await SpUtils.getString('currentUserName');
+    if (curUrl != reqUrl || curUser != reqUser) {
+      handler.next(error);
+      return;
     }
     // 用新 token 重放原请求
     final token = await TokenManager.getAccessToken();
@@ -162,6 +177,7 @@ class DioUtil {
       throw NotLoginException("refresh token 不存在");
     }
     final baseUrl = await SpUtils.getString('CurrentBaseUrl');
+    final userName = await SpUtils.getString('currentUserName');
     final response = await _dio.post(
       '$baseUrl/api/v4/session/token/refresh',
       data: {'refresh_token': refreshToken},
@@ -171,6 +187,15 @@ class DioUtil {
       throw NotLoginException("刷新 token 失败");
     }
     final data = body['data'] as Map<String, dynamic>;
+    // 刷新期间账号可能已切换/登出（切号、改密、退出登录）：
+    // 丢弃旧账号的刷新结果，避免覆盖新账号 token 上下文
+    final curUrl = await SpUtils.getString('CurrentBaseUrl');
+    final curUser = await SpUtils.getString('currentUserName');
+    if (curUrl != baseUrl ||
+        curUser != userName ||
+        !(await SpUtils.getBool('isLogin'))) {
+      return;
+    }
     await TokenManager.saveTokens(
       accessToken: data['access_token'] as String,
       refreshToken: data['refresh_token'] as String,

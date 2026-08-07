@@ -1,4 +1,4 @@
-import 'package:flutter_application_2/util/DioUtil.dart';
+import 'package:cloudpavilion/util/DioUtil.dart';
 
 /// 分享相关 V4 API
 class ShareApi {

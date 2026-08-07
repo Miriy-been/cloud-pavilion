@@ -1,15 +1,18 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/api/AuthApi.dart';
-import 'package:flutter_application_2/api/FileApi.dart';
-import 'package:flutter_application_2/config/AppTheme.dart';
-import 'package:flutter_application_2/config/AppWidgets.dart';
-import 'package:flutter_application_2/exception/DebugReportException.dart';
-import 'package:flutter_application_2/page/login/users.dart';
-import 'package:flutter_application_2/util/FingerprintService.dart';
-import 'package:flutter_application_2/util/SpUtils.dart';
-import 'package:flutter_application_2/util/TokenAutoRefresh.dart';
-import 'package:flutter_application_2/util/TokenManager.dart';
+import 'package:cloudpavilion/api/AuthApi.dart';
+import 'package:cloudpavilion/api/FileApi.dart';
+import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/exception/DebugReportException.dart';
+import 'package:cloudpavilion/page/login/users.dart';
+import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/FingerprintService.dart';
+import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
+import 'package:cloudpavilion/util/TokenManager.dart';
+import 'package:cloudpavilion/util/UploadManager.dart';
+import 'package:cloudpavilion/util/WorkflowTaskManager.dart';
 import 'dart:convert';
 
 import '../../config/SlideUpPageRoute.dart';
@@ -433,7 +436,6 @@ class _LoginState extends State<Login> {
         Map<String, dynamic> jsonData = json.decode(value);
         if (jsonData['siteUrl'] != siteUrl ||
             jsonData['userName'] != userInfo['userName']) {
-          convertAvatar(siteUrl, jsonData['data']);
           accountList.add(value);
         }
       }
@@ -444,6 +446,10 @@ class _LoginState extends State<Login> {
     SpUtils.setBool("isLogin", true);
     SpUtils.setString('currentMenu', 'cloudreve://my');
     SpUtils.setString('folderStack', '');
+    // 加载该账号的任务记录（下载/上传/后台任务按账号隔离）
+    await DownloadManager.instance.switchAccount();
+    await UploadManager.instance.switchAccount();
+    await WorkflowTaskManager.instance.switchAccount();
     // 登录成功后启动 token 定时自动刷新
     TokenAutoRefresh.instance.start();
 
