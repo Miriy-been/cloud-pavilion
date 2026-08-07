@@ -43,7 +43,7 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
     },
     "userName": ""
   };
-  final Uri _url = Uri.parse('https://github.com/Miriy-been/flutter_reve');
+  final Uri _url = Uri.parse('https://github.com/Miriy-been/cloud-pavilion');
   late String _freshTime = "";
   late int _used = 0;
   late int _total = 1;
@@ -139,6 +139,10 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
                       onTap: () =>
                           Navigator.push(context, SlideUpPageRoute(Users())),
                     ),
+                    IconTile(
+                      icon: Icons.logout,
+                      onTap: _confirmLogout,
+                    ),
                   ],
                 ),
               ),
@@ -171,6 +175,70 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 赞赏码内容（置于「支持开发者」折叠面板内）
+  Widget _buildRewardBody() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _showRewardPreview,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'images/赞赏码.png',
+                width: 180,
+                height: 180,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '如果觉得好用，欢迎扫码支持一下',
+            style: TextStyle(fontSize: 12, color: AppColors.ink3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 赞赏码大图预览
+  void _showRewardPreview() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'images/赞赏码.png',
+                  width: 280,
+                  height: 280,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '感谢支持',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -234,13 +302,11 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  /// 设置分组
+  /// 设置分组：高频项平铺展示，低频项收纳进「更多设置」折叠面板
   Widget _buildSettings() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _GroupTitle('通用'),
-        const SizedBox(height: 6),
+        // 高频：隐私安全 / 外观偏好 / 我的分享
         GroupCard(
           children: [
             SettingRow(
@@ -261,20 +327,6 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
               onTap: _showAppearanceSheet,
             ),
             SettingRow(
-              icon: Icons.download_outlined,
-              iconColor: FileType.IMAGE.fg,
-              iconBg: FileType.IMAGE.bg,
-              label: '下载路径',
-              onTap: _showDownloadPathSheet,
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        const _GroupTitle('内容'),
-        const SizedBox(height: 6),
-        GroupCard(
-          children: [
-            SettingRow(
               icon: Icons.link,
               iconColor: AppColors.primary,
               iconBg: AppColors.primarySoft,
@@ -284,45 +336,99 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
                 MaterialPageRoute(builder: (_) => const SharesPage()),
               ),
             ),
-            SettingRow(
-              icon: Icons.forum_outlined,
-              iconColor: AppColors.warning,
-              iconBg: AppColors.warningBg,
-              label: '项目地址',
-              onTap: () => launchUrl(_url),
-            ),
-            SettingRow(
-              icon: Icons.system_update_alt,
-              iconColor: AppColors.primary,
-              iconBg: AppColors.primarySoft,
-              label: '检查更新',
-              onTap: () => UpdateChecker.check(manual: true, context: context),
-            ),
-            SettingRow(
-              icon: Icons.cleaning_services_outlined,
-              iconColor: FileType.DOC.fg,
-              iconBg: FileType.DOC.bg,
-              label: '清除缓存',
-              onTap: _clearCache,
+          ],
+        ),
+        const SizedBox(height: 12),
+        // 低频：更多设置（折叠面板）
+        GroupCard(
+          children: [
+            ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+              childrenPadding: EdgeInsets.zero,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              iconColor: AppColors.ink3,
+              collapsedIconColor: AppColors.ink3,
+              leading: _tileIcon(Icons.tune, FileType.DOC.fg, FileType.DOC.bg),
+              title: Text(
+                '更多设置',
+                style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ink),
+              ),
+              children: [
+                SettingRow(
+                  icon: Icons.forum_outlined,
+                  iconColor: AppColors.warning,
+                  iconBg: AppColors.warningBg,
+                  label: '项目地址',
+                  onTap: () => launchUrl(_url),
+                ),
+                SettingRow(
+                  icon: Icons.download_outlined,
+                  iconColor: FileType.IMAGE.fg,
+                  iconBg: FileType.IMAGE.bg,
+                  label: '下载路径',
+                  onTap: _showDownloadPathSheet,
+                ),
+                SettingRow(
+                  icon: Icons.system_update_alt,
+                  iconColor: AppColors.primary,
+                  iconBg: AppColors.primarySoft,
+                  label: '检查更新',
+                  onTap: () =>
+                      UpdateChecker.check(manual: true, context: context),
+                ),
+                SettingRow(
+                  icon: Icons.cleaning_services_outlined,
+                  iconColor: FileType.DOC.fg,
+                  iconBg: FileType.DOC.bg,
+                  label: '清除缓存',
+                  onTap: _clearCache,
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        const _GroupTitle('账户'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 12),
+        // 支持开发者（折叠面板，赞赏码）
         GroupCard(
           children: [
-            SettingRow(
-              icon: Icons.logout,
-              iconColor: AppColors.danger,
-              iconBg: AppColors.dangerBg,
-              label: '退出登录',
-              danger: true,
-              onTap: _confirmLogout,
+            ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+              childrenPadding: EdgeInsets.zero,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              iconColor: AppColors.ink3,
+              collapsedIconColor: AppColors.ink3,
+              leading: _tileIcon(
+                  Icons.favorite, AppColors.danger, AppColors.dangerBg),
+              title: Text(
+                '支持开发者',
+                style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ink),
+              ),
+              children: [_buildRewardBody()],
             ),
           ],
         ),
       ],
+    );
+  }
+
+  /// 折叠面板头部彩色小图标
+  Widget _tileIcon(IconData icon, Color color, Color bg) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 18, color: color),
     );
   }
 
@@ -603,26 +709,6 @@ class _Avatar extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => fallback,
-      ),
-    );
-  }
-}
-
-/// 分组标题
-class _GroupTitle extends StatelessWidget {
-  final String text;
-
-  const _GroupTitle(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.ink3,
-        letterSpacing: 0.5,
       ),
     );
   }

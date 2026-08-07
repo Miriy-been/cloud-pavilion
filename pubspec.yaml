@@ -85,6 +85,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # 打包进 App 的资源（仅赞赏码，其余截图仅供 README / GitHub 使用，不进 APK）
+  assets:
+    - images/赞赏码.png
+
 # App 图标源图配置（dart run flutter_launcher_icons 生成各密度图标）
 flutter_launcher_icons:
   android: true

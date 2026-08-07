@@ -18,10 +18,10 @@ class UpdateChecker {
 
   /// GitHub Releases 最新版本 API（未认证限流 60 次/小时/IP，App 低频检查足够）
   static const String _latestApi =
-      'https://api.github.com/repos/Miriy-been/flutter_reve/releases/latest';
+      'https://api.github.com/repos/Miriy-been/cloud-pavilion/releases/latest';
   /// 项目发布主页（release 无 APK 附件时的兜底下载入口）
   static const String _releasesPage =
-      'https://github.com/Miriy-been/flutter_reve/releases';
+      'https://github.com/Miriy-been/cloud-pavilion/releases';
 
   static const String _lastPromptKey = 'update_last_prompt_at';
   static const Duration _autoCooldown = Duration(hours: 24);
