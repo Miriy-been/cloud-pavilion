@@ -6,7 +6,7 @@
 .packages
 build/
 cloudreve源码/
-./# Kotlin 编译错误日志
+# Kotlin 编译错误日志
 android/.kotlin/
 # If you're building an application, you may want to check-in your pubspec.lock
 pubspec.lock
@@ -14,7 +14,7 @@ pubspec.lock
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.
 doc/api/
-
+.trae/
 # dotenv environment variables file
 .env*
 .idea
