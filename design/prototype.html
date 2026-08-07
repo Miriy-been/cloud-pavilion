@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudReve · UI 原型 v1</title>
+<style>
+  /* ============ 设计令牌 ============ */
+  :root{
+    --bg:        #F4F6FA;
+    --surface:   #FFFFFF;
+    --ink:       #0B1220;
+    --ink-2:     #5B6478;
+    --ink-3:     #9AA3B5;
+    --line:      #E8EBF1;
+    --primary:   #2F6BFF;
+    --primary-soft:#EDF3FF;
+    --success:   #12B76A;
+    --danger:    #E5484D;
+    --warning:   #F5A623;
+
+    --r-card: 20px;
+    --r-item: 14px;
+    --r-tile: 12px;
+    --r-pill: 999px;
+
+    --shadow-card: 0 1px 2px rgba(11,18,32,.04), 0 8px 24px rgba(11,18,32,.05);
+    --shadow-nav:  0 12px 32px rgba(11,18,32,.28);
+
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+            "HarmonyOS Sans SC", "MiSans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ font-family:var(--font); color:var(--ink); background:#EDEFF4; -webkit-font-smoothing:antialiased; }
+  body{ padding:0 0 80px; }
+
+  /* ============ 看板头部 ============ */
+  .board-header{
+    max-width:1280px; margin:0 auto; padding:44px 32px 28px;
+  }
+  .board-header h1{ font-size:28px; font-weight:700; letter-spacing:-.4px; }
+  .board-header .sub{ margin-top:6px; color:var(--ink-2); font-size:14px; }
+  .tokens{
+    margin-top:22px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  }
+  .token{
+    display:inline-flex; align-items:center; gap:8px; background:var(--surface);
+    border:1px solid var(--line); border-radius:999px; padding:6px 14px 6px 8px;
+    font-size:12px; color:var(--ink-2);
+  }
+  .swatch{ width:18px; height:18px; border-radius:6px; flex:none; border:1px solid rgba(11,18,32,.08); }
+  .notes{ margin-top:20px; display:flex; flex-wrap:wrap; gap:8px; }
+  .note{
+    font-size:12.5px; color:var(--ink-2); background:var(--surface);
+    border-radius:10px; padding:8px 12px; border:1px solid var(--line); line-height:1.6;
+  }
+  .note b{ color:var(--ink); font-weight:600; }
+
+  /* ============ 看板栅格 ============ */
+  .board{
+    max-width:1280px; margin:0 auto; padding:0 32px;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(408px, 1fr));
+    gap:56px 36px; justify-items:center;
+  }
+  .frame{ width:100%; display:flex; flex-direction:column; align-items:center; }
+  .frame-label{
+    margin-top:18px; text-align:center;
+  }
+  .frame-label .no{
+    font-size:11px; letter-spacing:1.5px; color:var(--ink-3); font-weight:600;
+  }
+  .frame-label .name{
+    margin-top:4px; font-size:16px; font-weight:600; letter-spacing:-.2px;
+  }
+  .frame-label .desc{ margin-top:4px; font-size:12.5px; color:var(--ink-3); line-height:1.6; max-width:340px; }
+
+  /* ============ 手机框 ============ */
+  .phone{
+    width:375px; background:#0B1220; border-radius:52px; padding:11px;
+    box-shadow:0 30px 60px rgba(11,18,32,.28), inset 0 0 0 2px rgba(255,255,255,.06);
+    position:relative;
+  }
+  .screen{
+    width:100%; height:760px; background:var(--bg); border-radius:42px;
+    overflow:hidden; position:relative; display:flex; flex-direction:column;
+  }
+  .punch{ position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    width:11px; height:11px; border-radius:50%; background:#0B1220; z-index:30; }
+
+  /* 状态栏 */
+  .status{
+    height:44px; flex:none; display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px; font-size:13px; font-weight:600; color:var(--ink); position:relative; z-index:20;
+  }
+  .sb-right{ display:flex; align-items:center; gap:6px; }
+  .sig{ display:flex; gap:3px; }
+  .sig span{ width:3px; border-radius:2px; background:var(--ink); opacity:.85; }
+  .sig span:nth-child(1){height:7px;} .sig span:nth-child(2){height:9px;}
+  .sig span:nth-child(3){height:6px;} .sig span:nth-child(4){height:11px;}
+  .batt{ width:22px; height:11px; border:1.5px solid var(--ink); border-radius:3px; position:relative; opacity:.85; }
+  .batt::after{ content:""; position:absolute; right:-4px; top:2.5px; width:2px; height:5px; border-radius:1px; background:var(--ink); }
+  .batt i{ position:absolute; left:1.5px; top:1.5px; bottom:1.5px; width:55%; background:var(--ink); border-radius:1px; opacity:.7; }
+
+  /* 页面内容滚动区 */
+  .page{
+    flex:1; overflow:hidden; position:relative; padding:6px 18px 0; display:flex; flex-direction:column;
+  }
+  .scroll{ flex:1; overflow:hidden; display:flex; flex-direction:column; }
+  .spacer{ flex:1; }
+
+  /* ============ 图标系统 ============ */
+  .ic{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8;
+       stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .ic-sm{ width:18px; height:18px; }
+  .ic-xs{ width:16px; height:16px; }
+  .ic-lg{ width:26px; height:26px; }
+
+  /* ============ 通用组件 ============ */
+  .appbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 2px 12px; }
+  .appbar .left{ display:flex; align-items:center; gap:14px; }
+  .appbar .right{ display:flex; align-items:center; gap:16px; }
+  .title-lg{ font-size:27px; font-weight:700; letter-spacing:-.4px; }
+  .subtitle{ margin-top:3px; font-size:12.5px; color:var(--ink-3); }
+  .icon-btn{ width:40px; height:40px; border-radius:13px; display:flex; align-items:center; justify-content:center;
+             color:var(--ink); background:transparent; }
+  .icon-btn.tile{ background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-card); }
+
+  .avatar{ width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#2F6BFF,#6C8CFF);
+           display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:16px;
+           box-shadow:0 2px 8px rgba(47,107,255,.3); }
+  .avatar.sm{ width:34px; height:34px; font-size:14px; }
+  .avatar.lg{ width:64px; height:64px; font-size:24px; }
+
+  .chip{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500;
+         padding:5px 12px; border-radius:999px; background:var(--primary-soft); color:var(--primary); }
+  .chip.plain{ background:var(--surface); color:var(--ink-2); border:1px solid var(--line); }
+
+  /* 容量卡 */
+  .hero{
+    background:linear-gradient(135deg,#16305F 0%, #1E4BD1 55%, #2F6BFF 100%);
+    border-radius:var(--r-card); padding:20px; color:#fff; box-shadow:0 16px 32px rgba(31,75,209,.28);
+    position:relative; overflow:hidden; flex:none;
+  }
+  .hero::after{ content:""; position:absolute; right:-40px; top:-60px; width:190px; height:190px;
+                border-radius:50%; background:rgba(255,255,255,.08); }
+  .hero::before{ content:""; position:absolute; right:24px; bottom:-70px; width:150px; height:150px;
+                 border-radius:50%; background:rgba(255,255,255,.05); }
+  .hero-top{ display:flex; align-items:center; justify-content:space-between; position:relative; z-index:1; }
+  .hero-label{ font-size:12.5px; opacity:.75; letter-spacing:.2px; }
+  .hero-pct{ font-size:14px; font-weight:600; opacity:.95; }
+  .hero-num-row{ margin-top:10px; display:flex; align-items:baseline; gap:8px; position:relative; z-index:1; }
+  .hero-num{ font-size:30px; font-weight:700; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .hero-total{ font-size:13px; opacity:.65; font-variant-numeric:tabular-nums; }
+  .progress{ margin-top:16px; height:6px; border-radius:999px; background:rgba(255,255,255,.22); overflow:hidden; position:relative; z-index:1; }
+  .progress > i{ display:block; height:100%; border-radius:999px; background:#fff; }
+  .hero-meta{ margin-top:12px; font-size:12px; opacity:.65; position:relative; z-index:1; }
+
+  /* 快捷操作 */
+  .quick-row{ display:flex; gap:10px; margin-top:14px; flex:none; }
+  .quick-btn{
+    flex:1; height:46px; display:flex; align-items:center; justify-content:center; gap:8px;
+    border-radius:var(--r-pill); font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .quick-btn.primary{ background:var(--primary); color:#fff; box-shadow:0 8px 20px rgba(47,107,255,.25); }
+  .quick-btn.ghost{ background:var(--surface); color:var(--ink); border:1px solid var(--line); box-shadow:var(--shadow-card); }
+
+  /* 分区标签 */
+  .sec{ margin-top:20px; flex:none; }
+  .sec-label{ display:flex; align-items:center; justify-content:space-between; padding:0 2px; }
+  .sec-title{ font-size:13px; font-weight:600; color:var(--ink-3); letter-spacing:.3px; }
+  .sec-count{ font-size:12px; color:var(--ink-3); }
+  .sec-right{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-2); }
+  .sort-chip{ display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--ink-2); font-weight:500; }
+
+  /* 列表行 */
+  .row{ display:flex; align-items:center; gap:12px; padding:11px 2px; border-bottom:1px solid var(--line); }
+  .row:last-child{ border-bottom:none; }
+  .tile{ width:44px; height:44px; border-radius:var(--r-tile); display:flex; align-items:center; justify-content:center; flex:none; }
+  .tile .ic{ width:22px; height:22px; }
+  .t-folder{ background:#EDF3FF; color:#2F6BFF; }
+  .t-image { background:#F3EEFF; color:#7C5CFC; }
+  .t-video { background:#FFEEF0; color:#E5484D; }
+  .t-audio { background:#FFF3E6; color:#F5A623; }
+  .t-doc   { background:#E6F7F5; color:#14B8A6; }
+  .t-arc   { background:#FFF7E0; color:#D97706; }
+  .t-other { background:#F1F2F4; color:#5B6478; }
+  .row-body{ flex:1; min-width:0; }
+  .row-title{ font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row-meta{ margin-top:2px; font-size:12px; color:var(--ink-3); }
+  .row-trailing{ color:var(--ink-3); display:flex; align-items:center; gap:2px; }
+
+  /* 多选 */
+  .check{ width:22px; height:22px; border-radius:50%; border:1.8px solid var(--line); background:var(--surface); flex:none; }
+  .check.on{ background:var(--primary); border-color:var(--primary); position:relative; }
+  .check.on::after{ content:""; position:absolute; left:50%; top:46%; width:5px; height:9px;
+                    border:solid #fff; border-width:0 2px 2px 0; transform:translate(-50%,-50%) rotate(42deg); }
+  .actionbar{
+    position:absolute; left:14px; right:14px; bottom:16px; height:58px; background:var(--surface);
+    border-radius:18px; box-shadow:0 12px 32px rgba(11,18,32,.16); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-around; z-index:40;
+  }
+  .actionbar .act{ display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11.5px; color:var(--ink-2); width:72px; }
+  .actionbar .act .ic{ width:21px; height:21px; }
+  .actionbar .act.danger{ color:var(--danger); }
+
+  /* 悬浮 + 胶囊导航（签名元素） */
+  .fab{
+    position:absolute; right:20px; bottom:96px; width:54px; height:54px; border-radius:18px;
+    background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 12px 28px rgba(11,18,32,.32); z-index:40;
+  }
+  .fab .ic{ width:24px; height:24px; }
+  /* 通栏导航：纯白底色与页面融合，选中态用柔和浅蓝圆角按钮 */
+  .pill-nav{
+    position:absolute; left:0; right:0; bottom:0; z-index:45;
+    display:flex; gap:2px; align-items:stretch;
+    width:100%;
+    background:#FFFFFF;
+    padding:6px 0 10px;
+    box-shadow:0 -1px 4px rgba(11,18,32,.04), 0 -8px 24px rgba(11,18,32,.05);
+  }
+  .nav-item{
+    flex:1; width:auto; height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; border-radius:999px; color:#868686; font-size:10px; font-weight:500;
+    transition:all .2s ease;
+  }
+  /* 当前选中 Tab：柔和浅蓝圆角按钮，图标与文字使用主题色 */
+  .nav-item.active{ background:var(--primary-soft); color:var(--primary); }
+  /* 通栏导航页：内容底部让位，避免被导航遮住 */
+  .screen:has(.pill-nav) .page{ padding-bottom:70px; }
+  .nav-item .ic{ width:21px; height:21px; }
+
+  /* ============ 表单 ============ */
+  .field{
+    height:52px; background:var(--surface); border:1.5px solid var(--line); border-radius:16px;
+    display:flex; align-items:center; padding:0 16px; gap:10px; margin-top:10px;
+  }
+  .field:focus-within{ border-color:var(--primary); box-shadow:0 0 0 4px rgba(47,107,255,.1); }
+  .field .ic{ color:var(--ink-3); }
+  .field input{ flex:1; border:none; outline:none; font-size:15px; font-family:var(--font); background:transparent; color:var(--ink); }
+  .field input::placeholder{ color:var(--ink-3); }
+  .field-label{ font-size:13px; font-weight:600; color:var(--ink-2); margin-top:16px; }
+  .field-label:first-child{ margin-top:0; }
+
+  .btn-pill{
+    height:52px; width:100%; margin-top:18px; border-radius:999px; border:none; cursor:pointer;
+    background:var(--primary); color:#fff; font-size:16px; font-weight:600; font-family:var(--font);
+    box-shadow:0 12px 26px rgba(47,107,255,.3);
+  }
+  .btn-pill:active{ transform:translateY(1px); }
+  .ghost-row{ display:flex; justify-content:center; gap:8px; margin-top:14px; }
+  .btn-ghost{
+    display:flex; align-items:center; gap:7px; height:38px; padding:0 16px; border-radius:999px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+    font-size:13px; font-weight:500; font-family:var(--font);
+  }
+  .btn-ghost .ic{ width:16px; height:16px; }
+
+  .terms{ text-align:center; font-size:11.5px; color:var(--ink-3); line-height:1.7; }
+  .terms b{ color:var(--ink-2); font-weight:500; }
+
+  /* 居中启动页 */
+  .center-page{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 20px; }
+  .logo-mark{ width:76px; height:76px; border-radius:24px;
+    background:linear-gradient(135deg,#2F6BFF,#6C8CFF); display:flex; align-items:center; justify-content:center;
+    color:#fff; box-shadow:0 16px 36px rgba(47,107,255,.35); }
+  .logo-mark .ic{ width:40px; height:40px; stroke-width:1.6; }
+  .logo-mark.sm{ width:58px; height:58px; border-radius:19px; box-shadow:0 12px 26px rgba(47,107,255,.3); }
+  .logo-mark.sm .ic{ width:31px; height:31px; }
+
+  .welcome-title{ margin-top:22px; font-size:24px; font-weight:700; letter-spacing:-.3px; }
+  .welcome-sub{ margin-top:8px; font-size:14px; color:var(--ink-3); text-align:center; line-height:1.6; }
+
+  /* ============ 分段控件 ============ */
+  .seg{ display:flex; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:3px; }
+  .seg-item{
+    flex:1; height:36px; display:flex; align-items:center; justify-content:center; gap:6px;
+    border-radius:999px; font-size:13px; font-weight:500; color:var(--ink-2); cursor:pointer; white-space:nowrap;
+  }
+  .seg-item.active{ background:var(--ink); color:#fff; box-shadow:0 4px 12px rgba(11,18,32,.22); }
+  .seg-item .num{ font-size:10.5px; opacity:.75; font-variant-numeric:tabular-nums; }
+
+  /* 下载行 */
+  .dl-row{ padding:13px 2px; border-bottom:1px solid var(--line); }
+  .dl-top{ display:flex; align-items:center; gap:12px; }
+  .dl-info{ flex:1; min-width:0; }
+  .dl-name{ font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dl-pct{ font-size:12.5px; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+  .dl-bar{ margin-top:10px; margin-left:56px; height:5px; border-radius:999px; background:var(--line); overflow:hidden; }
+  .dl-bar > i{ display:block; height:100%; border-radius:999px; background:var(--primary); }
+  .dl-bar.done > i{ background:var(--success); }
+  .dl-bar.err > i{ background:var(--danger); }
+
+  .empty{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+          color:var(--ink-3); padding-bottom:40px; }
+  .empty .ic{ width:46px; height:46px; opacity:.5; }
+  .empty p{ font-size:13.5px; }
+  .empty b{ font-size:12px; color:var(--ink-3); font-weight:500; }
+
+  /* ============ 账户页 ============ */
+  .profile{ display:flex; align-items:center; gap:14px; padding:14px 2px 4px; }
+  .profile .p-name{ font-size:19px; font-weight:700; letter-spacing:-.2px; }
+  .profile .p-mail{ margin-top:3px; font-size:12.5px; color:var(--ink-3); }
+  .profile .p-site{ margin-top:8px; }
+
+  .stat-row{ display:flex; gap:10px; margin-top:16px; }
+  .stat-cell{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-item);
+              padding:12px 14px; box-shadow:var(--shadow-card); }
+  .stat-cell .k{ font-size:11.5px; color:var(--ink-3); }
+  .stat-cell .v{ margin-top:5px; font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.2px; }
+
+  .group{ margin-top:18px; }
+  .group-title{ font-size:12px; font-weight:600; color:var(--ink-3); letter-spacing:.5px; padding:0 4px; margin-bottom:6px; }
+  .gcard{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-item); overflow:hidden; box-shadow:var(--shadow-card); }
+  .setting-row{ display:flex; align-items:center; gap:12px; padding:13px 14px; border-bottom:1px solid var(--line); }
+  .setting-row:last-child{ border-bottom:none; }
+  .setting-ic{ width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex:none; }
+  .setting-ic .ic{ width:18px; height:18px; }
+  .si-blue{ background:var(--primary-soft); color:var(--primary); }
+  .si-teal{ background:#E6F7F5; color:#14B8A6; }
+  .si-amber{ background:#FFF3E6; color:#F5A623; }
+  .si-green{ background:#E9F9F1; color:#12B76A; }
+  .si-red{ background:#FFEEF0; color:var(--danger); }
+  .setting-label{ flex:1; font-size:14.5px; font-weight:500; }
+  .setting-label.danger{ color:var(--danger); }
+  .setting-row .row-trailing{ color:var(--ink-3); }
+
+  /* ============ 账户管理 ============ */
+  .site-sec{ margin-top:18px; }
+  .site-head{ display:flex; align-items:center; gap:8px; padding:0 4px; margin-bottom:6px; }
+  .site-dot{ width:8px; height:8px; border-radius:50%; background:var(--primary); }
+  .site-name{ font-size:13px; font-weight:600; color:var(--ink); }
+  .acc-row{ display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line);
+            border-radius:var(--r-item); padding:12px 14px; margin-bottom:8px; box-shadow:var(--shadow-card); }
+  .acc-name{ font-size:14.5px; font-weight:600; }
+  .acc-mail{ margin-top:2px; font-size:12px; color:var(--ink-3); }
+  .radio{ width:22px; height:22px; border-radius:50%; border:1.8px solid var(--line); flex:none; background:var(--surface); }
+  .radio.on{ background:var(--primary); border-color:var(--primary); position:relative; }
+  .radio.on::after{ content:""; position:absolute; left:50%; top:46%; width:5px; height:9px;
+                    border:solid #fff; border-width:0 2px 2px 0; transform:translate(-50%,-50%) rotate(42deg); }
+
+  /* ============ 回收站 / 分享 行 ============ */
+  .mini-actions{ display:flex; gap:14px; color:var(--ink-3); }
+  .mini-actions .ic{ width:19px; height:19px; }
+  .mini-actions .danger{ color:var(--danger); }
+  .mini-actions .ok{ color:var(--primary); }
+
+  /* ============ 搜索 ============ */
+  .search-box{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line);
+               border-radius:16px; height:48px; padding:0 16px; box-shadow:var(--shadow-card); }
+  .search-box .ic{ color:var(--ink-3); }
+  .search-box span{ flex:1; color:var(--ink-3); font-size:14.5px; }
+  .search-box .cancel{ color:var(--primary); font-size:14px; font-weight:600; }
+  .recent{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+
+  /* 首页指示条 */
+  .homebar{ position:absolute; bottom:7px; left:50%; transform:translateX(-50%);
+            width:26px; height:4px; border-radius:999px; background:rgba(11,18,32,.85); z-index:50; }
+</style>
+</head>
+<body>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 15.5l-4.2-4.2-9.3 9.3"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10 9.5l5 2.5-5 2.5z"/></symbol>
+  <symbol id="i-audio" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="i-arc" viewBox="0 0 24 24"><path d="M4 8h16v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19V8z"/><path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5V8H3V5.5z"/><path d="M10 12h4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M19 6l-.9 13a2 2 0 0 1-2 1.9H7.9a2 2 0 0 1-2-1.9L5 6"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7.1l1.7-1.7"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3.5" y="11" width="17" height="10" rx="2.5"/><path d="M7.5 11V7.5a4.5 4.5 0 0 1 9 0V11"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-forum" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.3L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h3v3h-3zM21 14v7M14 21h1"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7.1l1.7-1.7"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M11 18h2"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0 0 20.5 15"/></symbol>
+  <symbol id="i-switch" viewBox="0 0 24 24"><path d="M8 7h12M8 7l3-3M8 7l3 3M16 17H4M16 17l-3-3M16 17l-3 3"/></symbol>
+</svg>
+
+<!-- ================= 看板头部 ================= -->
+<header class="board-header">
+  <h1>CloudReve · 移动端 UI 原型 v1</h1>
+  <div class="sub">简约 · 现代 · 克制的单一品牌蓝 —— 全 App 仅一种强调色，其余交给留白与字重节奏。</div>
+
+  <div class="tokens">
+    <span class="token"><span class="swatch" style="background:#2F6BFF"></span>Primary #2F6BFF</span>
+    <span class="token"><span class="swatch" style="background:#0B1220"></span>Ink #0B1220</span>
+    <span class="token"><span class="swatch" style="background:#5B6478"></span>Ink-2 #5B6478</span>
+    <span class="token"><span class="swatch" style="background:#9AA3B5"></span>Ink-3 #9AA3B5</span>
+    <span class="token"><span class="swatch" style="background:#F4F6FA"></span>Bg #F4F6FA</span>
+    <span class="token"><span class="swatch" style="background:#E8EBF1"></span>Line #E8EBF1</span>
+    <span class="token"><span class="swatch" style="background:#12B76A"></span>Success #12B76A</span>
+    <span class="token"><span class="swatch" style="background:#E5484D"></span>Danger #E5484D</span>
+    <span class="token"><span class="swatch" style="background:#F5A623"></span>Warn #F5A623</span>
+  </div>
+
+  <div class="notes">
+    <span class="note"><b>01</b> 单一品牌蓝，颜色从“五彩斑斓”收敛为一种</span>
+    <span class="note"><b>02</b> 白色通栏导航融入页面，选中态柔和浅蓝圆角按钮</span>
+    <span class="note"><b>03</b> 文件图标统一为柔和圆角瓦片，节奏一致</span>
+    <span class="note"><b>04</b> 大标题 + 大留白 + tabular 数字字体</span>
+    <span class="note"><b>05</b> 危险操作统一红色语义，错误不暧昧</span>
+  </div>
+</header>
+
+<main class="board">
+
+<!-- ========== 01 站点绑定 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="center-page">
+          <div class="logo-mark"><svg class="ic"><use href="#i-cloud"/></svg></div>
+          <div class="welcome-title">欢迎使用 CloudReve</div>
+          <div class="welcome-sub">绑定你的站点，随时随地访问云端文件</div>
+          <div style="width:100%; margin-top:26px;">
+            <div class="field-label">站点地址</div>
+            <div class="field"><svg class="ic"><use href="#i-globe"/></svg>
+              <input value="https://ling101-cloudreve.ms.show">
+            </div>
+            <button class="btn-pill">继续</button>
+            <div class="ghost-row">
+              <button class="btn-ghost"><svg class="ic"><use href="#i-qr"/></svg>扫码绑定</button>
+              <button class="btn-ghost"><svg class="ic"><use href="#i-switch"/></svg>多账号管理</button>
+            </div>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <div class="terms" style="padding-bottom:22px;">
+          协议（http/https）需与 Web 端一致<br>
+          继续即表示接受 <b>服务条款</b> 与 <b>隐私政策</b>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 01</div>
+    <div class="name">站点绑定</div>
+    <div class="desc">首屏即绑定页：Logo 发光 + 单一输入框 + 胶囊主按钮。两个次级入口弱化为幽灵按钮。</div>
+  </div>
+</section>
+
+<!-- ========== 02 登录 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="center-page">
+          <div class="logo-mark sm"><svg class="ic"><use href="#i-cloud"/></svg></div>
+          <div class="welcome-title" style="margin-top:16px;">登录</div>
+          <div class="welcome-sub">账号信息由你的站点提供</div>
+          <div style="width:100%; margin-top:26px;">
+            <div class="field-label">邮箱</div>
+            <div class="field"><svg class="ic"><use href="#i-user"/></svg>
+              <input value="2126925013@qq.com">
+            </div>
+            <div class="field-label">密码</div>
+            <div class="field"><svg class="ic"><use href="#i-lock"/></svg>
+              <input type="password" value="123456" style="letter-spacing:2px;">
+            </div>
+            <button class="btn-pill">登录</button>
+            <div class="ghost-row">
+              <button class="btn-ghost"><svg class="ic"><use href="#i-qr"/></svg>扫码登录</button>
+              <button class="btn-ghost"><svg class="ic"><use href="#i-switch"/></svg>多账号管理</button>
+            </div>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <div class="terms" style="padding-bottom:22px;">继续即表示接受 <b>服务条款</b> 与 <b>隐私政策</b></div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 02</div>
+    <div class="name">登录</div>
+    <div class="desc">与绑定页共用同一套表单语言，形成一致的进入流程。</div>
+  </div>
+</section>
+
+<!-- ========== 03 存储 · 列表 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">我的存储</div>
+            <div class="subtitle">CloudReve 演示站 · 云空间</div>
+          </div>
+          <div class="right">
+            <span class="icon-btn"><svg class="ic"><use href="#i-search"/></svg></span>
+            <span class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></span>
+            <span class="avatar sm">鹿</span>
+          </div>
+        </div>
+
+        <div class="hero">
+          <div class="hero-top">
+            <span class="hero-label">已用空间</span>
+            <span class="hero-pct">25%</span>
+          </div>
+          <div class="hero-num-row">
+            <span class="hero-num">12.6 GB</span>
+            <span class="hero-total">/ 50 GB</span>
+          </div>
+          <div class="progress"><i style="width:25%"></i></div>
+          <div class="hero-meta">剩余 37.4 GB · 更新于 2026/07/28</div>
+        </div>
+
+        <div class="quick-row">
+          <div class="quick-btn primary"><svg class="ic"><use href="#i-upload"/></svg>上传</div>
+          <div class="quick-btn ghost"><svg class="ic"><use href="#i-plus"/></svg>新建文件夹</div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label">
+            <span class="sec-title">全部文件 <span class="sec-count">· 5</span></span>
+            <span class="sort-chip"><svg class="ic ic-xs"><use href="#i-sort"/></svg>最近修改</span>
+          </div>
+          <div style="margin-top:6px;">
+            <div class="row">
+              <div class="tile t-folder"><svg class="ic"><use href="#i-folder"/></svg></div>
+              <div class="row-body"><div class="row-title">项目文档</div><div class="row-meta">12 项 · 07/28</div></div>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+            <div class="row">
+              <div class="tile t-folder"><svg class="ic"><use href="#i-folder"/></svg></div>
+              <div class="row-body"><div class="row-title">照片备份</div><div class="row-meta">208 项 · 07/25</div></div>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+            <div class="row">
+              <div class="tile t-image"><svg class="ic"><use href="#i-image"/></svg></div>
+              <div class="row-body"><div class="row-title">IMG_2041.jpg</div><div class="row-meta">2.4 MB · 07/28</div></div>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+            <div class="row">
+              <div class="tile t-video"><svg class="ic"><use href="#i-video"/></svg></div>
+              <div class="row-body"><div class="row-title">旅行vlog.mp4</div><div class="row-meta">128 MB · 07/20</div></div>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+            <div class="row">
+              <div class="tile t-arc"><svg class="ic"><use href="#i-arc"/></svg></div>
+              <div class="row-body"><div class="row-title">源码打包.zip</div><div class="row-meta">86 MB · 07/12</div></div>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fab"><svg class="ic"><use href="#i-plus"/></svg></div>
+      <div class="pill-nav">
+        <span class="nav-item active"><svg class="ic"><use href="#i-cloud"/></svg>存储</span>
+        <span class="nav-item"><svg class="ic"><use href="#i-download"/></svg>下载</span>
+        <span class="nav-item"><svg class="ic"><use href="#i-user"/></svg>用户</span>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 03</div>
+    <div class="name">存储 · 列表</div>
+    <div class="desc">核心页面：深蓝渐变容量卡（全 App 唯一的彩色块）+ 快捷操作 + 柔和瓦片文件行。导航通栏铺满底部，Tab 均分整行。</div>
+  </div>
+</section>
+
+<!-- ========== 04 存储 · 网格 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">我的存储</div>
+            <div class="subtitle">CloudReve 演示站 · 云空间</div>
+          </div>
+          <div class="right">
+            <span class="icon-btn"><svg class="ic"><use href="#i-search"/></svg></span>
+            <span class="icon-btn"><svg class="ic"><use href="#i-trash"/></svg></span>
+            <span class="avatar sm">鹿</span>
+          </div>
+        </div>
+
+        <div class="hero">
+          <div class="hero-top">
+            <span class="hero-label">已用空间</span>
+            <span class="hero-pct">25%</span>
+          </div>
+          <div class="hero-num-row">
+            <span class="hero-num">12.6 GB</span>
+            <span class="hero-total">/ 50 GB</span>
+          </div>
+          <div class="progress"><i style="width:25%"></i></div>
+          <div class="hero-meta">剩余 37.4 GB · 更新于 2026/07/28</div>
+        </div>
+
+        <div class="quick-row">
+          <div class="quick-btn primary"><svg class="ic"><use href="#i-upload"/></svg>上传</div>
+          <div class="quick-btn ghost"><svg class="ic"><use href="#i-plus"/></svg>新建文件夹</div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label">
+            <span class="sec-title">全部文件 <span class="sec-count">· 6</span></span>
+            <span class="sort-chip"><svg class="ic ic-xs"><use href="#i-sort"/></svg>最近修改</span>
+          </div>
+          <div style="margin-top:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:12px;">
+            <div style="text-align:center;">
+              <div class="tile t-folder" style="width:58px;height:58px;margin:0 auto;border-radius:16px;"><svg class="ic" style="width:28px;height:28px;"><use href="#i-folder"/></svg></div>
+              <div style="margin-top:7px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">项目文档</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="tile t-folder" style="width:58px;height:58px;margin:0 auto;border-radius:16px;"><svg class="ic" style="width:28px;height:28px;"><use href="#i-folder"/></svg></div>
+              <div style="margin-top:7px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">照片备份</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="tile t-image" style="width:58px;height:58px;margin:0 auto;border-radius:16px;"><svg class="ic" style="width:28px;height:28px;"><use href="#i-image"/></svg></div>
+              <div style="margin-top:7px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">IMG_2041.jpg</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="tile t-video" style="width:58px;height:58px;margin:0 auto;border-radius:16px;"><svg class="ic" style="width:28px;height:28px;"><use href="#i-video"/></svg></div>
+              <div style="margin-top:7px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">旅行vlog.mp4</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="tile t-doc" style="width:58px;height:58px;margin:0 auto;border-radius:16px;"><svg class="ic" style="width:28px;height:28px;"><use href="#i-doc"/></svg></div>
+              <div style="margin-top:7px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">年度报告.pdf</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="tile t-arc" style="width:58px;height:58px;margin:0 auto;border-radius:16px;"><svg class="ic" style="width:28px;height:28px;"><use href="#i-arc"/></svg></div>
+              <div style="margin-top:7px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">源码打包.zip</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fab"><svg class="ic"><use href="#i-plus"/></svg></div>
+      <div class="pill-nav">
+        <span class="nav-item active"><svg class="ic"><use href="#i-cloud"/></svg>存储</span>
+        <span class="nav-item"><svg class="ic"><use href="#i-download"/></svg>下载</span>
+        <span class="nav-item"><svg class="ic"><use href="#i-user"/></svg>用户</span>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 04</div>
+    <div class="name">存储 · 网格视图</div>
+    <div class="desc">三列网格，瓦片放大为 58px，与列表视图共用同一套图标色板。</div>
+  </div>
+</section>
+
+<!-- ========== 05 存储 · 多选 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="icon-btn"><svg class="ic"><use href="#i-close"/></svg></span>
+            <div>
+              <div class="title-lg" style="font-size:22px;">已选 3 项</div>
+            </div>
+          </div>
+          <div class="right">
+            <span style="font-size:13px;color:var(--primary);font-weight:600;">全选</span>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label"><span class="sec-title">全部文件 <span class="sec-count">· 6</span></span></div>
+          <div style="margin-top:6px;">
+            <div class="row">
+              <span class="check on"></span>
+              <div class="tile t-folder"><svg class="ic"><use href="#i-folder"/></svg></div>
+              <div class="row-body"><div class="row-title">项目文档</div><div class="row-meta">12 项 · 07/28</div></div>
+            </div>
+            <div class="row">
+              <span class="check"></span>
+              <div class="tile t-folder"><svg class="ic"><use href="#i-folder"/></svg></div>
+              <div class="row-body"><div class="row-title">照片备份</div><div class="row-meta">208 项 · 07/25</div></div>
+            </div>
+            <div class="row">
+              <span class="check on"></span>
+              <div class="tile t-image"><svg class="ic"><use href="#i-image"/></svg></div>
+              <div class="row-body"><div class="row-title">IMG_2041.jpg</div><div class="row-meta">2.4 MB · 07/28</div></div>
+            </div>
+            <div class="row">
+              <span class="check on"></span>
+              <div class="tile t-video"><svg class="ic"><use href="#i-video"/></svg></div>
+              <div class="row-body"><div class="row-title">旅行vlog.mp4</div><div class="row-meta">128 MB · 07/20</div></div>
+            </div>
+            <div class="row">
+              <span class="check"></span>
+              <div class="tile t-doc"><svg class="ic"><use href="#i-doc"/></svg></div>
+              <div class="row-body"><div class="row-title">年度报告.pdf</div><div class="row-meta">3.1 MB · 07/18</div></div>
+            </div>
+            <div class="row">
+              <span class="check"></span>
+              <div class="tile t-arc"><svg class="ic"><use href="#i-arc"/></svg></div>
+              <div class="row-body"><div class="row-title">源码打包.zip</div><div class="row-meta">86 MB · 07/12</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="actionbar">
+        <span class="act"><svg class="ic"><use href="#i-download"/></svg>下载</span>
+        <span class="act"><svg class="ic"><use href="#i-share"/></svg>分享</span>
+        <span class="act danger"><svg class="ic"><use href="#i-trash"/></svg>删除</span>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 05</div>
+    <div class="name">存储 · 多选操作</div>
+    <div class="desc">圆形选中态 + 底部悬浮操作条，删除保持红色语义。</div>
+  </div>
+</section>
+
+<!-- ========== 06 下载 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">下载</div>
+            <div class="subtitle">本地与服务器任务一览</div>
+          </div>
+          <div class="right">
+            <span class="icon-btn tile"><svg class="ic"><use href="#i-refresh"/></svg></span>
+          </div>
+        </div>
+
+        <div class="seg">
+          <div class="seg-item active">下载中 <span class="num">2</span></div>
+          <div class="seg-item">已完成 <span class="num">5</span></div>
+          <div class="seg-item">服务器任务 <span class="num">1</span></div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <div class="dl-row">
+            <div class="dl-top">
+              <div class="tile t-video"><svg class="ic"><use href="#i-video"/></svg></div>
+              <div class="dl-info"><div class="dl-name">旅行vlog.mp4</div></div>
+              <span class="dl-pct">62%</span>
+            </div>
+            <div class="dl-bar"><i style="width:62%"></i></div>
+          </div>
+          <div class="dl-row">
+            <div class="dl-top">
+              <div class="tile t-arc"><svg class="ic"><use href="#i-arc"/></svg></div>
+              <div class="dl-info"><div class="dl-name">设计素材.zip</div></div>
+              <span class="dl-pct">34%</span>
+            </div>
+            <div class="dl-bar"><i style="width:34%"></i></div>
+          </div>
+          <div class="dl-row">
+            <div class="dl-top">
+              <div class="tile t-doc"><svg class="ic"><use href="#i-doc"/></svg></div>
+              <div class="dl-info"><div class="dl-name">产品手册.pdf</div></div>
+              <span class="dl-pct">12%</span>
+            </div>
+            <div class="dl-bar"><i style="width:12%"></i></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label"><span class="sec-title">全部完成时自动通知</span></div>
+        </div>
+        <div class="empty" style="padding-bottom:20px;">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <p>暂无其他进行中的任务</p>
+          <b>下载完成的任务将归档到「已完成」</b>
+        </div>
+      </div>
+      <div class="pill-nav">
+        <span class="nav-item"><svg class="ic"><use href="#i-cloud"/></svg>存储</span>
+        <span class="nav-item active"><svg class="ic"><use href="#i-download"/></svg>下载</span>
+        <span class="nav-item"><svg class="ic"><use href="#i-user"/></svg>用户</span>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 06</div>
+    <div class="name">下载中心</div>
+    <div class="desc">分段控件统一为胶囊，进度条细至 5px 保持轻盈，空态给出行动指引。</div>
+  </div>
+</section>
+
+<!-- ========== 07 用户 / 我的 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">我的</div>
+          </div>
+          <div class="right">
+            <span class="icon-btn tile"><svg class="ic"><use href="#i-sliders"/></svg></span>
+          </div>
+        </div>
+
+        <div class="profile">
+          <div class="avatar lg">鹿</div>
+          <div style="flex:1;">
+            <div class="p-name">小鹿</div>
+            <div class="p-mail">2126925013@qq.com</div>
+            <div class="p-site"><span class="chip"><svg class="ic ic-xs"><use href="#i-cloud"/></svg>CloudReve 演示站</span></div>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-cell"><div class="k">UID</div><div class="v">1</div></div>
+          <div class="stat-cell"><div class="k">用户组</div><div class="v">VIP</div></div>
+          <div class="stat-cell"><div class="k">WebDAV</div><div class="v" style="color:var(--success);font-size:13px;">已开启</div></div>
+        </div>
+
+        <div class="hero" style="margin-top:16px;">
+          <div class="hero-top">
+            <span class="hero-label">已用空间</span>
+            <span class="hero-pct">25%</span>
+          </div>
+          <div class="hero-num-row">
+            <span class="hero-num">12.6 GB</span>
+            <span class="hero-total">/ 50 GB</span>
+          </div>
+          <div class="progress"><i style="width:25%"></i></div>
+          <div class="hero-meta">剩余 37.4 GB · 更新于 2026/07/28</div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">通用</div>
+          <div class="gcard">
+            <div class="setting-row">
+              <span class="setting-ic si-blue"><svg class="ic"><use href="#i-shield"/></svg></span>
+              <span class="setting-label">隐私和安全</span>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+            <div class="setting-row">
+              <span class="setting-ic si-teal"><svg class="ic"><use href="#i-sliders"/></svg></span>
+              <span class="setting-label">外观偏好</span>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">内容</div>
+          <div class="gcard">
+            <div class="setting-row">
+              <span class="setting-ic si-blue"><svg class="ic"><use href="#i-link"/></svg></span>
+              <span class="setting-label">我的分享</span>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+            <div class="setting-row">
+              <span class="setting-ic si-amber"><svg class="ic"><use href="#i-forum"/></svg></span>
+              <span class="setting-label">项目地址</span>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="margin-bottom:14px;">
+          <div class="group-title">账户</div>
+          <div class="gcard">
+            <div class="setting-row">
+              <span class="setting-ic si-red"><svg class="ic"><use href="#i-logout"/></svg></span>
+              <span class="setting-label danger">退出登录</span>
+              <span class="row-trailing"><svg class="ic ic-sm"><use href="#i-chev-r"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pill-nav">
+        <span class="nav-item"><svg class="ic"><use href="#i-cloud"/></svg>存储</span>
+        <span class="nav-item"><svg class="ic"><use href="#i-download"/></svg>下载</span>
+        <span class="nav-item active"><svg class="ic"><use href="#i-user"/></svg>用户</span>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 07</div>
+    <div class="name">我的 / 用户中心</div>
+    <div class="desc">彩色统计卡收敛为三枚浅色小卡；设置项按语义分组（通用 / 内容 / 账户），危险操作独立成组并标红。</div>
+  </div>
+</section>
+
+<!-- ========== 08 账户管理 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">账户管理</div>
+            <div class="subtitle">绑定多个站点 · 快速切换</div>
+          </div>
+          <div class="right">
+            <span class="icon-btn"><svg class="ic"><use href="#i-qr"/></svg></span>
+            <span class="icon-btn"><svg class="ic"><use href="#i-plus"/></svg></span>
+          </div>
+        </div>
+
+        <div class="site-sec">
+          <div class="site-head"><span class="site-dot"></span><span class="site-name">CloudReve 演示站</span></div>
+          <div class="acc-row">
+            <div class="avatar sm">鹿</div>
+            <div style="flex:1; min-width:0;">
+              <div class="acc-name">小鹿</div>
+              <div class="acc-mail">2126925013@qq.com</div>
+            </div>
+            <span class="radio on"></span>
+          </div>
+          <div class="acc-row">
+            <div class="avatar sm" style="background:linear-gradient(135deg,#7C5CFC,#B79CFF);">D</div>
+            <div style="flex:1; min-width:0;">
+              <div class="acc-name">Dev 账号</div>
+              <div class="acc-mail">dev@example.com</div>
+            </div>
+            <span class="radio"></span>
+          </div>
+        </div>
+
+        <div class="site-sec">
+          <div class="site-head"><span class="site-dot" style="background:var(--success);"></span><span class="site-name">我的家庭云</span></div>
+          <div class="acc-row">
+            <div class="avatar sm" style="background:linear-gradient(135deg,#14B8A6,#5EEAD4);">明</div>
+            <div style="flex:1; min-width:0;">
+              <div class="acc-name">阿明</div>
+              <div class="acc-mail">ming@home.com</div>
+            </div>
+            <span class="radio"></span>
+          </div>
+        </div>
+
+        <div class="empty" style="padding-bottom:10px;">
+          <svg class="ic"><use href="#i-plus"/></svg>
+          <p>绑定新站点</p>
+          <b>扫码或输入站点地址即可加入</b>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 08</div>
+    <div class="name">账户管理</div>
+    <div class="desc">按站点分组，当前账号用蓝色圆点标记，空白区域给「绑定新站点」的邀请式空态。</div>
+  </div>
+</section>
+
+<!-- ========== 09 我的分享 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">我的分享</div>
+            <div class="subtitle">3 个分享链接</div>
+          </div>
+          <div class="right">
+            <span class="icon-btn tile"><svg class="ic"><use href="#i-plus"/></svg></span>
+          </div>
+        </div>
+
+        <div style="margin-top:4px;">
+          <div class="row">
+            <div class="tile t-doc"><svg class="ic"><use href="#i-link"/></svg></div>
+            <div class="row-body"><div class="row-title">年度报告.pdf</div><div class="row-meta">访问 24 次 · 永久有效</div></div>
+            <span class="row-trailing"><svg class="ic"><use href="#i-more"/></svg></span>
+          </div>
+          <div class="row">
+            <div class="tile t-arc" style="background:#FFF3E6;color:#F5A623;"><svg class="ic"><use href="#i-lock"/></svg></div>
+            <div class="row-body"><div class="row-title">私密素材.zip</div><div class="row-meta">访问 6 次 · 7 天后过期</div></div>
+            <span class="row-trailing"><svg class="ic"><use href="#i-more"/></svg></span>
+          </div>
+          <div class="row">
+            <div class="tile t-video"><svg class="ic"><use href="#i-link"/></svg></div>
+            <div class="row-body"><div class="row-title">旅行vlog.mp4</div><div class="row-meta">访问 132 次 · 永久有效</div></div>
+            <span class="row-trailing"><svg class="ic"><use href="#i-more"/></svg></span>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label">
+            <span class="sec-title">分享说明</span>
+          </div>
+          <div class="gcard" style="margin-top:8px;padding:14px;font-size:12.5px;color:var(--ink-2);line-height:1.8;">
+            私有分享将生成带密码的链接，过期后自动失效。<br>
+            复制链接可直接发送给任意用户。
+          </div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 09</div>
+    <div class="name">我的分享</div>
+    <div class="desc">公开/私有用瓦片色与锁图标区分，元信息统一为「访问次数 · 有效期」。</div>
+  </div>
+</section>
+
+<!-- ========== 10 回收站 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div>
+            <div class="title-lg">回收站</div>
+            <div class="subtitle">3 项 · 30 天后自动清除</div>
+          </div>
+          <div class="right">
+            <span style="font-size:13px;color:var(--danger);font-weight:600;">清空</span>
+          </div>
+        </div>
+
+        <div style="margin-top:4px;">
+          <div class="row">
+            <div class="tile t-other"><svg class="ic"><use href="#i-folder"/></svg></div>
+            <div class="row-body"><div class="row-title">旧项目</div><div class="row-meta">128 MB · 07/20</div></div>
+            <div class="mini-actions">
+              <span class="ok"><svg class="ic"><use href="#i-restore"/></svg></span>
+              <span class="danger"><svg class="ic"><use href="#i-trash"/></svg></span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="tile t-other"><svg class="ic"><use href="#i-doc"/></svg></div>
+            <div class="row-body"><div class="row-title">废弃方案.docx</div><div class="row-meta">2.1 MB · 07/19</div></div>
+            <div class="mini-actions">
+              <span class="ok"><svg class="ic"><use href="#i-restore"/></svg></span>
+              <span class="danger"><svg class="ic"><use href="#i-trash"/></svg></span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="tile t-other"><svg class="ic"><use href="#i-image"/></svg></div>
+            <div class="row-body"><div class="row-title">截图_2026.png</div><div class="row-meta">512 KB · 07/15</div></div>
+            <div class="mini-actions">
+              <span class="ok"><svg class="ic"><use href="#i-restore"/></svg></span>
+              <span class="danger"><svg class="ic"><use href="#i-trash"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 10</div>
+    <div class="name">回收站</div>
+    <div class="desc">图标统一降饱和（灰阶），恢复用蓝色、彻底删除用红色，一目了然。</div>
+  </div>
+</section>
+
+<!-- ========== 11 搜索 ========== -->
+<section class="frame">
+  <div class="phone">
+    <div class="screen">
+      <div class="punch"></div>
+      <div class="status"><span>9:41</span>
+        <span class="sb-right"><span class="sig"><span></span><span></span><span></span><span></span></span>
+        <span class="batt"><i></i></span></span>
+      </div>
+      <div class="page">
+        <div class="appbar">
+          <div class="search-box">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span>搜索文件名</span>
+            <span class="cancel">取消</span>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label"><span class="sec-title">最近搜索</span></div>
+          <div class="recent">
+            <span class="chip plain">旅行</span>
+            <span class="chip plain">报告</span>
+            <span class="chip plain">项目</span>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-label">
+            <span class="sec-title">搜索结果 <span class="sec-count">· 3</span></span>
+          </div>
+          <div style="margin-top:6px;">
+            <div class="row">
+              <div class="tile t-folder"><svg class="ic"><use href="#i-folder"/></svg></div>
+              <div class="row-body"><div class="row-title">项目文档</div><div class="row-meta">文件夹 · 12 项</div></div>
+            </div>
+            <div class="row">
+              <div class="tile t-doc"><svg class="ic"><use href="#i-doc"/></svg></div>
+              <div class="row-body"><div class="row-title">项目需求说明.pdf</div><div class="row-meta">文件 · 1.2 MB</div></div>
+            </div>
+            <div class="row">
+              <div class="tile t-image"><svg class="ic"><use href="#i-image"/></svg></div>
+              <div class="row-body"><div class="row-title">项目封面.png</div><div class="row-meta">文件 · 3.4 MB</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+  <div class="frame-label">
+    <div class="no">SCREEN 11</div>
+    <div class="name">搜索</div>
+    <div class="desc">搜索框融入导航区，最近搜索用胶囊标签，结果行与存储页保持同构。</div>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

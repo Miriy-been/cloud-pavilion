@@ -1,0 +1,84 @@
+name: flutter_application_2
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# In Windows, build-name is used as the major, minor, and patch parts
+# of the product and file versions while build-number is used as the build suffix.
+version: 1.1.0+1
+
+environment:
+  sdk: ">=3.2.0-134.0.dev <4.0.0"
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  # 文件选择（上传）
+  file_picker: ^8.0.0
+  # 本地目录（下载保存）
+  path_provider: ^2.1.0
+  # 视频/音频预览
+  video_player: ^2.8.0
+  # 后台播放 + 系统媒体通知栏（锁屏/退出后持续播放，通知栏暂停/切歌）
+  just_audio: ^0.9.0
+  audio_service: ^0.18.0
+  # 缩略图/封面磁盘缓存（与通知栏封面共用同一缓存实例）
+  flutter_cache_manager: ^3.4.2
+  local_auth: ^3.0.2
+  flutter_secure_storage: ^10.3.1
+  # 请求
+  dio: ^5.3.2
+  # 本地配置缓存（登录态 / 下载模式等）——必须放 dependencies，
+  # 否则 release 构建的 GeneratedPluginRegistrant 不注册该原生插件，
+  # 运行时 channel 无法建立连接（启动即卡死）
+  shared_preferences: ^2.2.1
+  # 优美 dialog / 全局 toast
+  flutter_smart_dialog: ^4.9.4
+  # 时间 / 日期格式化
+  intl: ^0.18.1
+  # 打开外链（项目地址等）
+  url_launcher: ^6.0.10
+  # 读取当前应用版本号（更新检查用）
+  package_info_plus: ^7.0.0
+  # 网络类型监听（WiFi / 移动数据，用于省流策略）
+  connectivity_plus: ^6.0.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  # 下拉按钮
+  pull_down_button: ^0.9.3
+  # 下拉选项
+  dropdown_button2: ^2.3.9
+  # 百分比饼图
+  percent_indicator: ^4.0.1
+  # dialog
+  giffy_dialog: ^2.0.0+2
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
