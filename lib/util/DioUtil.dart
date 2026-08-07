@@ -36,8 +36,11 @@ class DioUtil {
   /// 响应超时时间
   static const Duration receiveTimeout = Duration(milliseconds: 60 * 1000);
 
-  /// 自定义认证头名称（服务器修改过，Bearer 前缀必须有）
-  static const String authHeaderName = 'X-Cloudreve-Token';
+  /// 标准认证头（Cloudreve 默认读取，Bearer 前缀必须有）
+  static const String authHeaderName = 'Authorization';
+  /// 兼容自定义认证头：部分自建站点把认证头改成了 X-Cloudreve-Token，
+  /// 两个头同时携带，服务端按自己读取的那个认证即可
+  static const String altAuthHeaderName = 'X-Cloudreve-Token';
 
   /// 初始化
   DioUtil._internal() {
@@ -59,10 +62,25 @@ class DioUtil {
     if (baseUrl.isNotEmpty) {
       options.baseUrl = baseUrl;
     }
-    // 添加认证头
+    // 主动刷新（对齐网页版）：请求发出前检查 access token 是否已过期/即将过期，
+    // 过期则先刷新再发送，避免把过期 token 发给服务器被降级成匿名。
+    // 登录/刷新接口自身不走此逻辑，防止递归。
+    if (!options.path.contains('/session/token')) {
+      try {
+        if (await TokenManager.isAccessTokenExpired() &&
+            await SpUtils.getBool('isLogin')) {
+          await refreshTokenNow();
+        }
+      } catch (_) {
+        // 刷新失败不阻塞请求，交由 401 错误处理兜底（失败最终会走登出流程）
+      }
+    }
+    // 添加认证头（登录/刷新接口无需携带，对齐网页版 noCredential）
+    final isTokenEndpoint = options.path.contains('/session/token');
     final token = await TokenManager.getAccessToken();
-    if (token.isNotEmpty) {
+    if (token.isNotEmpty && !isTokenEndpoint) {
       options.headers[authHeaderName] = 'Bearer $token';
+      options.headers[altAuthHeaderName] = 'Bearer $token';
     }
     handler.next(options);
   }
@@ -122,6 +140,7 @@ class DioUtil {
     // 用新 token 重放原请求
     final token = await TokenManager.getAccessToken();
     error.requestOptions.headers[authHeaderName] = 'Bearer $token';
+    error.requestOptions.headers[altAuthHeaderName] = 'Bearer $token';
     try {
       final response = await _dio.fetch(error.requestOptions);
       handler.resolve(response);

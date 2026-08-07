@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_application_2/api/FileApi.dart';
 import 'package:flutter_application_2/api/SecurityApi.dart';
@@ -83,6 +85,21 @@ class _SecurityPageState extends State<SecurityPage> {
       final userName = await SpUtils.getString('currentUserName');
       // 本机指纹保存的密码已是旧密码，一并移除
       await FingerprintService.disable(siteUrl, userName);
+      // 移除多账号快照中的该账号：token 已随改密失效，
+      // 不应再出现在账户管理页且可被旧 token 登录
+      final accounts = await SpUtils.getStringList('accounts');
+      if (accounts.isNotEmpty) {
+        final kept = accounts.where((raw) {
+          try {
+            final jsonData = json.decode(raw) as Map<String, dynamic>;
+            return !(jsonData['siteUrl'] == siteUrl &&
+                jsonData['userName'] == userName);
+          } catch (_) {
+            return true;
+          }
+        }).toList();
+        await SpUtils.setStringList('accounts', kept);
+      }
       if (!mounted) return;
       _currentPwd.clear();
       _newPwd.clear();
@@ -297,7 +314,8 @@ class _SecurityPageState extends State<SecurityPage> {
                                     fontWeight: FontWeight.w500,
                                     color: AppColors.ink)),
                             const SizedBox(height: 3),
-                            Text(a['siteName']?.toString() ?? siteUrl,
+                            // 站点地址：多站点场景下区分账号归属
+                            Text(siteUrl,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

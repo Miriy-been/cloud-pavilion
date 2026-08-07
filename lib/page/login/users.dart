@@ -78,6 +78,7 @@ class _UsersState extends State<Users> {
 
   /// 站点分组
   Widget _buildSiteSection(Map<String, dynamic> obj) {
+    final siteUrl = obj['siteUrl']?.toString() ?? '';
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Column(
@@ -96,12 +97,17 @@ class _UsersState extends State<Users> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  obj['siteName']?.toString() ?? '',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
+                Expanded(
+                  // 站点地址：多站点场景下区分账号归属
+                  child: Text(
+                    siteUrl,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

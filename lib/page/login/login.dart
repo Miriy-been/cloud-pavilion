@@ -239,14 +239,28 @@ class _LoginState extends State<Login> {
                           fontWeight: FontWeight.w600,
                           color: AppColors.ink)),
                 ),
-                ...accounts.map((a) => ListTile(
-                      leading: Icon(Icons.account_circle_outlined,
-                          color: AppColors.primary),
-                      title: Text(
-                          '${a['siteName'] ?? ''} · ${a['userName'] ?? ''}',
-                          style: const TextStyle(fontSize: 14)),
-                      onTap: () => Navigator.pop(ctx, a),
-                    )),
+                ...accounts.map((a) {
+                  final siteUrl = (a['siteUrl'] ?? '').toString();
+                  final userName = (a['userName'] ?? '').toString();
+                  return ListTile(
+                    leading: Icon(Icons.account_circle_outlined,
+                        color: AppColors.primary),
+                    // 站点地址换行展示，下面一行是用户名
+                    title: Text(
+                      siteUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      userName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    onTap: () => Navigator.pop(ctx, a),
+                  );
+                }),
                 const SizedBox(height: 8),
               ],
             ),
