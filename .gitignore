@@ -6,6 +6,8 @@
 .packages
 build/
 cloudreve源码/
+./# Kotlin 编译错误日志
+android/.kotlin/
 # If you're building an application, you may want to check-in your pubspec.lock
 pubspec.lock
 
