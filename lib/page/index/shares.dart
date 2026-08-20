@@ -142,24 +142,43 @@ class _SharesPageState extends State<SharesPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  share['name']?.toString() ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w600),
+                // 分享对象（与创建分享弹窗统一：小字卡片突出文件名）
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.bg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.link, size: 16, color: AppColors.ink3),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          share['name']?.toString() ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12.5, color: AppColors.ink2),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (isPrivate) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '访问密码：$currentPassword · 不可修改',
+                    '访问密码不可修改',
                     style: TextStyle(fontSize: 12, color: AppColors.ink3),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 DropdownButtonFormField<int?>(
                   initialValue: null,
-                  decoration: const InputDecoration(labelText: '有效期'),
+                  decoration:
+                      appFieldDecoration('有效期', hint: '永久有效'),
                   items: const [
                     DropdownMenuItem<int?>(value: null, child: Text('永久')),
                     DropdownMenuItem<int?>(value: 86400, child: Text('1 天')),
@@ -168,11 +187,13 @@ class _SharesPageState extends State<SharesPage> {
                   ],
                   onChanged: (v) => setState(() => expireSeconds = v),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text('下载后自动过期'),
+                    Expanded(
+                      child: Text('下载后自动过期',
+                          style: TextStyle(
+                              fontSize: 14, color: AppColors.ink)),
                     ),
                     Switch(
                       value: autoExpire,
@@ -183,14 +204,12 @@ class _SharesPageState extends State<SharesPage> {
                 ),
                 if (autoExpire)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 4),
+                    padding: const EdgeInsets.only(top: 12),
                     child: TextField(
                       controller: remainController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '下载次数（达到次数后失效）',
-                        hintText: '例如 10',
-                      ),
+                      decoration:
+                          appFieldDecoration('下载次数', hint: '达到次数后失效'),
                     ),
                   ),
               ],

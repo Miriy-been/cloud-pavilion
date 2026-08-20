@@ -6,7 +6,7 @@
 
 **Tech Stack:** Flutter / Dart / dio / shared_preferences / flutter_smart_dialog / file_picker（新增）/ path_provider（新增）
 
-**联调环境:** Cloudreve 4.18.0 服务器 `https://ling101-cloudreve.ms.show`（已部署）
+**联调环境:** Cloudreve 4.18.0 服务器 `https://xxx.com`（已部署）
 
 ---
 
@@ -167,7 +167,7 @@ void _onRequest(RequestOptions options, RequestInterceptorHandler handler) async
 
 **Step 1:** `selectConfig()` 中 `result['data']['title']` 逻辑不变（V4 `site/config/basic` 仍返回 `data.title`），仅确认 `AuthApi.getConfig()` 已指向 V4 路径即可。
 
-**Step 2:** 硬编码服务器地址改为 `_siteAddrController.text = "https://ling101-cloudreve.ms.show"`（联调服务器）。
+**Step 2:** 硬编码服务器地址改为 `_siteAddrController.text = "xxx.com"`（联调服务器）。
 
 **Step 3:** 验证：真机/模拟器 `flutter run` → 绑定站点页输入地址 → 显示站点标题 → 进入登录页。
 

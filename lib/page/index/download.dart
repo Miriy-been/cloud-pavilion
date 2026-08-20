@@ -30,6 +30,13 @@ class _DownloadState extends State<Download>
     super.dispose();
   }
 
+  /// 手动刷新：重新触发下载 / 上传列表重建，
+  /// 用于主题切换后 UI 残留旧配色等需要即时重绘的场景
+  void _refresh() {
+    DownloadManager.instance.notifyListeners();
+    UploadManager.instance.notifyListeners();
+  }
+
   @override
   Widget build(BuildContext context) {
     // 订阅主题：深浅色切换时重建页面与任务行图标配色
@@ -43,6 +50,13 @@ class _DownloadState extends State<Download>
             child: PageHeader(
               title: '传输',
               subtitle: '下载与上传任务一览',
+              actions: [
+                // 手动刷新：重新触发传输列表重建（如主题切换后 UI 残留旧配色）
+                IconTile(
+                  icon: Icons.refresh,
+                  onTap: _refresh,
+                ),
+              ],
             ),
           ),
           // 计数徽标 + 选中高亮：监听任务状态与标签切换，轻量刷新不重建整页
@@ -99,7 +113,11 @@ class _DownloadTabState extends State<_DownloadTab>
   Widget build(BuildContext context) {
     super.build(context);
     Theme.of(context);
+    // 主题切换时强制重建：EmptyState 的配色由 AppColors 静态令牌计算，
+    // 若不复建会在切换瞬间残留旧主题颜色（文字变淡等错乱）
+    final brightness = Theme.of(context).brightness;
     return ListenableBuilder(
+      key: ValueKey(brightness),
       listenable: DownloadManager.instance,
       builder: (context, _) {
         final tasks = DownloadManager.instance.tasks;
@@ -154,7 +172,10 @@ class _UploadTabState extends State<_UploadTab>
   Widget build(BuildContext context) {
     super.build(context);
     Theme.of(context);
+    // 主题切换时强制重建，避免 EmptyState 残留旧主题配色
+    final brightness = Theme.of(context).brightness;
     return ListenableBuilder(
+      key: ValueKey(brightness),
       listenable: UploadManager.instance,
       builder: (context, _) {
         final tasks = UploadManager.instance.tasks;

@@ -20,6 +20,26 @@ SnackBar appSnack(String message) => SnackBar(
       duration: const Duration(milliseconds: 2500),
     );
 
+/// 统一的圆角输入框装饰（表单 / 弹窗共用）
+/// 字号与配色与全局设计令牌一致，保证各弹窗输入控件样式统一
+InputDecoration appFieldDecoration(String label, {String? hint}) =>
+    InputDecoration(
+      labelText: label,
+      hintText: hint,
+      labelStyle: TextStyle(fontSize: 13, color: AppColors.ink2),
+      hintStyle: TextStyle(fontSize: 12.5, color: AppColors.ink3),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.line),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    );
+
 /// 字节数格式化
 String formatBytes(int fileSize) {
   if (fileSize <= 0) return '0 B';

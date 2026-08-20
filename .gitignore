@@ -6,6 +6,8 @@
 .packages
 build/
 cloudreve源码/
+docs/
+design/
 # Kotlin 编译错误日志
 android/.kotlin/
 # IntelliJ 模块文件（IDE 自动生成，无需提交）
@@ -14,7 +16,8 @@ android/.kotlin/
 
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.
-doc/api/
+
+
 .trae/
 # dotenv environment variables file
 .env*
