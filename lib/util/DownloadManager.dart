@@ -115,6 +115,12 @@ class DownloadManager extends ChangeNotifier {
     await restore();
   }
 
+  /// 清空已完成 / 已取消 / 失败的历史记录（保留进行中的任务）
+  Future<void> clearFinished() async {
+    tasks.removeWhere((t) => t.status != DownloadStatus.downloading);
+    _notifyImmediate();
+  }
+
   /// 应用专属下载目录：/storage/emulated/0/cloudreve（自动创建，Android 11+ 需授权）
   Future<String> _appDir() async {
     final res = await _downloadsChannel

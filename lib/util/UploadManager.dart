@@ -92,6 +92,12 @@ class UploadManager extends ChangeNotifier {
     await restore();
   }
 
+  /// 清空已完成 / 已取消 / 失败的历史记录（保留进行中的任务）
+  Future<void> clearFinished() async {
+    tasks.removeWhere((t) => t.status != UploadStatus.uploading);
+    _notifyImmediate();
+  }
+
   /// 开始上传一个文件（后台执行）
   Future<void> startUpload({
     required String name,

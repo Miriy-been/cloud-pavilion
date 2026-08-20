@@ -120,7 +120,13 @@ class _DownloadTabState extends State<_DownloadTab>
             for (final t in active) _DownloadRow(task: t),
             if (active.isNotEmpty && done.isNotEmpty) const SizedBox(height: 14),
             if (done.isNotEmpty) ...[
-              SectionHeader(title: '已完成', count: '${done.length}'),
+              SectionHeader(
+                title: '已完成',
+                count: '${done.length}',
+                trailing: _ClearButton(
+                  onTap: () => DownloadManager.instance.clearFinished(),
+                ),
+              ),
               const SizedBox(height: 2),
               for (final t in done) _DownloadRow(task: t),
             ],
@@ -169,7 +175,13 @@ class _UploadTabState extends State<_UploadTab>
             for (final t in active) _UploadRow(task: t),
             if (active.isNotEmpty && done.isNotEmpty) const SizedBox(height: 14),
             if (done.isNotEmpty) ...[
-              SectionHeader(title: '已完成', count: '${done.length}'),
+              SectionHeader(
+                title: '已完成',
+                count: '${done.length}',
+                trailing: _ClearButton(
+                  onTap: () => UploadManager.instance.clearFinished(),
+                ),
+              ),
               const SizedBox(height: 2),
               for (final t in done) _UploadRow(task: t),
             ],
@@ -399,6 +411,55 @@ class _RetryButton extends StatelessWidget {
           border: Border.all(color: AppColors.line),
         ),
         child: Icon(Icons.refresh, size: 18, color: AppColors.primary),
+      ),
+    );
+  }
+}
+
+/// 清空已完成记录按钮（仅在已有完成记录时展示）
+class _ClearButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ClearButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      // 弹确认框：批量清空不可撤销，先让用户确认，也避免误触
+      onTap: () async {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('清空记录'),
+            content: const Text('确定清空所有已完成（含失败/取消）的记录吗？进行中的任务不会被清除。'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('取消')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+                child: const Text('清空'),
+              ),
+            ],
+          ),
+        );
+        if (ok == true) onTap();
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_sweep_outlined, size: 15, color: AppColors.ink3),
+            const SizedBox(width: 4),
+            Text(
+              '清空',
+              style: TextStyle(fontSize: 12, color: AppColors.ink3),
+            ),
+          ],
+        ),
       ),
     );
   }

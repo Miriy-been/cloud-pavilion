@@ -8,7 +8,6 @@ import 'package:cloudpavilion/exception/DebugReportException.dart';
 import 'package:cloudpavilion/page/login/users.dart';
 import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/util/DownloadManager.dart';
-import 'package:cloudpavilion/util/FingerprintService.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
 import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
 import 'package:cloudpavilion/util/TokenManager.dart';
@@ -147,12 +146,6 @@ class _LoginState extends State<Login> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       GhostButton(
-                        label: '指纹登录',
-                        icon: Icons.fingerprint,
-                        onPressed: () => _fingerprintLogin(context),
-                      ),
-                      const SizedBox(width: 8),
-                      GhostButton(
                         label: '多账号管理',
                         icon: Icons.switch_account_rounded,
                         onPressed: () {
@@ -205,147 +198,11 @@ class _LoginState extends State<Login> {
             result['msg']?.toString() ?? '邮箱或密码错误');
       }
 
-      // 登录成功：若该账号未开启指纹登录且设备支持，询问开启
-      await _offerEnableFingerprint(
-          context, siteUrl, _emailController.text, _passwordController.text);
-
       await _finalizeLogin(context, result, siteUrl, _emailController.text);
     } catch (e) {
       // 登录失败：显式提示（不依赖全局异常处理器）
       if (mounted) _showError(context, e);
     }
-  }
-
-  /// 指纹登录（本地指纹解锁已保存的账号凭据，多账号需先选择账号）
-  void _fingerprintLogin(BuildContext context) async {
-    try {
-      final accounts = await FingerprintService.listAccounts();
-      if (accounts.isEmpty) {
-        throw DebugReportException('此账号尚未开启指纹登录\n请先使用密码登录，成功后按提示开启');
-      }
-
-      // 选账号：多个时弹出选择，单个直接使用
-      Map<String, dynamic> account;
-      if (accounts.length == 1) {
-        account = accounts.first;
-      } else {
-        final selected = await showModalBottomSheet<Map<String, dynamic>>(
-          context: context,
-          builder: (ctx) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Text('选择要登录的账号',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.ink)),
-                ),
-                ...accounts.map((a) {
-                  final siteUrl = (a['siteUrl'] ?? '').toString();
-                  final userName = (a['userName'] ?? '').toString();
-                  return ListTile(
-                    leading: Icon(Icons.account_circle_outlined,
-                        color: AppColors.primary),
-                    // 站点地址换行展示，下面一行是用户名
-                    title: Text(
-                      siteUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    subtitle: Text(
-                      userName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    onTap: () => Navigator.pop(ctx, a),
-                  );
-                }),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        );
-        if (selected == null) return;
-        account = selected;
-      }
-
-      final siteUrl = (account['siteUrl'] ?? '').toString();
-      final userName = (account['userName'] ?? '').toString();
-      if (siteUrl.isEmpty || userName.isEmpty) {
-        throw DebugReportException('指纹账号信息不完整，请重新开启');
-      }
-
-      // 系统指纹验证
-      final ok = await FingerprintService.verify(
-          '验证指纹登录 ${account['siteName'] ?? userName}');
-      if (!ok) return; // 用户取消 / 验证失败
-
-      // 读取本地凭据并登录
-      final password =
-          await FingerprintService.passwordFor(siteUrl, userName);
-      if (password == null || password.isEmpty) {
-        throw DebugReportException('本地凭据缺失，请重新用密码登录');
-      }
-      SpUtils.setString('CurrentBaseUrl', siteUrl);
-      final config = await AuthApi.getConfig();
-      final siteTitle =
-          config['data']['title']?.toString() ?? account['siteName'] ?? '';
-      SpUtils.setString('CurrentTitle', siteTitle);
-      if (mounted) setState(() => _siteName = siteTitle);
-
-      final result = await AuthApi.login(userName, password);
-      if (result['code'] == 203) {
-        throw DebugReportException('该站点启用了两步验证，暂不支持');
-      }
-      if (result['code'] != 0) {
-        // 密码可能已被修改：清理本地凭据，避免反复失败
-        await FingerprintService.disable(siteUrl, userName);
-        throw DebugReportException('登录失败：本地密码可能已过期\n已关闭该账号指纹登录');
-      }
-      await _finalizeLogin(context, result, siteUrl, userName);
-    } catch (e) {
-      // 指纹验证取消（返回 false）已静默；其余错误显式提示
-      if (mounted) _showError(context, e);
-    }
-  }
-
-  /// 密码登录成功后询问是否开启指纹登录
-  Future<void> _offerEnableFingerprint(BuildContext context, String siteUrl,
-      String userName, String password) async {
-    if (!mounted) return;
-    try {
-      if (await FingerprintService.hasAccount(siteUrl, userName)) return;
-      if (!await FingerprintService.isAvailable()) return; // 设备不支持
-      final enable = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('开启指纹登录'),
-          content: const Text('下次可用指纹快速登录此账号，是否开启？'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('暂不')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('开启')),
-          ],
-        ),
-      );
-      if (enable == true && mounted) {
-        try {
-          await FingerprintService.enable(
-              siteUrl, userName, _siteName, password);
-        } catch (_) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(appSnack('开启指纹登录失败，请重试'));
-        }
-      }
-    } catch (_) {}
   }
 
   /// 登录失败统一提示：解析常见异常为中文文案并用 SnackBar 显示

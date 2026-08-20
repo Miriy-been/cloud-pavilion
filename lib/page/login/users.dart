@@ -3,6 +3,8 @@ import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/util/AuthState.dart';
+import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/FingerprintService.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
 import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
 import 'package:cloudpavilion/util/TokenManager.dart';
@@ -184,7 +186,22 @@ class _UsersState extends State<Users> {
                   ],
                 ),
               ),
-              _Radio(on: isCurrent),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Radio(on: isCurrent),
+                  // 删除本地登录记录（删除当前账号时同时退出登录）
+                  IconButton(
+                    onPressed: () => _deleteAccount(data),
+                    icon: Icon(Icons.delete_outline,
+                        size: 20, color: AppColors.danger),
+                    tooltip: '删除账号',
+                    constraints:
+                        const BoxConstraints(minWidth: 40, minHeight: 40),
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -227,12 +244,90 @@ class _UsersState extends State<Users> {
     });
   }
 
+  /// 删除账号的本地登录记录：从 `accounts` 快照移除；
+  /// 若为当前账号，则同时退出登录
+  Future<void> _deleteAccount(Map<String, dynamic> data) async {
+    final nickname =
+        (data['data']?['nickname'] ?? data['userName'] ?? '').toString();
+    final siteUrl = (data['siteUrl'] ?? '').toString();
+    final userName = (data['userName'] ?? '').toString();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除账号'),
+        content: Text('确定移除「$nickname」的本地登录记录吗？\n删除后再次登录需重新输入密码。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // 从本地账号快照移除该账号
+    final accounts = await SpUtils.getStringList('accounts');
+    final kept = accounts.where((raw) {
+      try {
+        final j = json.decode(raw) as Map<String, dynamic>;
+        return !(j['siteUrl'] == siteUrl && j['userName'] == userName);
+      } catch (_) {
+        return true;
+      }
+    }).toList();
+    await SpUtils.setStringList('accounts', kept);
+
+    // 若删除的是当前登录账号，一并退出登录
+    final curSite = await SpUtils.getString('CurrentBaseUrl');
+    final curUser = await SpUtils.getString('currentUserName');
+    if (curSite == siteUrl && curUser == userName) {
+      await _logoutCurrentAccount();
+      return; // 页面已被导航替换，无需刷新
+    }
+    if (mounted) getUserList();
+    SmartDialog.showToast('已删除账号');
+  }
+
+  /// 删除的是当前登录账号时，执行登出收尾并跳回登录页
+  Future<void> _logoutCurrentAccount() async {
+    AudioPlayerService.instance.stop();
+    TokenAutoRefresh.instance.stop();
+    for (final t in List.of(DownloadManager.instance.tasks)) {
+      DownloadManager.instance.cancel(t);
+    }
+    for (final t in List.of(UploadManager.instance.tasks)) {
+      UploadManager.instance.cancel(t);
+    }
+    FileApi.clearAllCache();
+    TokenManager.clear();
+    await SpUtils.setBool('isLogin', false);
+    AuthState.isLoggedIn.value = false;
+    Navigator.pushNamedAndRemoveUntil(context, "/home", (route) => false);
+  }
+
   /// 切换账号：将该账号的 token 写入当前上下文并回到主页
-  void login(Map<String, dynamic> data) async {
+  /// 设备支持生物识别时，需先指纹验证，防止他人直接代登账号
+  Future<void> login(Map<String, dynamic> data) async {
     final token = data['token'];
     if (token == null) {
       SmartDialog.showToast('该账号缺少登录信息，请重新登录');
       return;
+    }
+    // 安全校验：若开启指纹保护且设备支持生物识别，
+    // 多账号切换需指纹验证，防止他人直接代登账号
+    if (await SpUtils.getBool('fingerprintGuard', true) &&
+        await FingerprintService.isAvailable()) {
+      try {
+        final ok = await FingerprintService.verify('验证指纹后切换账号');
+        if (!ok) return; // 用户取消 / 验证失败，不切换
+      } catch (_) {
+        return; // 生物识别异常（如无已登记指纹）时放弃切换，避免绕过验证
+      }
     }
     await TokenManager.saveTokens(
       accessToken: token['access_token'],

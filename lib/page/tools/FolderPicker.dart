@@ -52,8 +52,8 @@ class _FolderPickerDialog extends StatefulWidget {
 }
 
 class _FolderPickerDialogState extends State<_FolderPickerDialog> {
-  /// 从根目录到当前目录的面包屑名称（不含根「我的存储」）
-  final List<String> _crumbs = [];
+  /// 从根目录到当前目录的面包屑，携带每级的名称与 uri（不含根「我的存储」）
+  final List<({String name, String uri})> _crumbs = [];
   late String _currentUri = widget.startUri;
   List<FileItemModel> _folders = [];
   bool _loading = true;
@@ -64,7 +64,7 @@ class _FolderPickerDialogState extends State<_FolderPickerDialog> {
     super.initState();
     // 起点非根目录时，把起点名称压入面包屑，支持逐级返回上级直至根目录
     if (_currentUri != FileApi.myRootUri) {
-      _crumbs.add(_displayNameOf(_currentUri));
+      _crumbs.add((name: _displayNameOf(_currentUri), uri: _currentUri));
     }
     _load();
   }
@@ -106,7 +106,7 @@ class _FolderPickerDialogState extends State<_FolderPickerDialog> {
 
   void _enter(FileItemModel folder) {
     setState(() {
-      _crumbs.add(folder.name);
+      _crumbs.add((name: folder.name, uri: folder.path));
       _currentUri = folder.path;
     });
     _load();
@@ -121,9 +121,23 @@ class _FolderPickerDialogState extends State<_FolderPickerDialog> {
     _load();
   }
 
-  String get _pathText {
-    if (_crumbs.isEmpty) return '我的存储';
-    return '我的存储 ▸ ${_crumbs.join(' ▸ ')}';
+  /// 跳转到面包屑某级：-1 表示根目录「我的存储」；
+  /// 0..n-1 表示对应层级（保留该层级及以上的面包屑，截断更深层）
+  void _jumpTo(int level) {
+    if (level == -1) {
+      setState(() {
+        _crumbs.clear();
+        _currentUri = FileApi.myRootUri;
+      });
+    } else if (level >= 0 && level < _crumbs.length) {
+      setState(() {
+        _currentUri = _crumbs[level].uri;
+        _crumbs.removeRange(level + 1, _crumbs.length);
+      });
+    } else {
+      return;
+    }
+    _load();
   }
 
   @override
@@ -131,161 +145,127 @@ class _FolderPickerDialogState extends State<_FolderPickerDialog> {
     return Dialog(
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  widget.allowCopy
-                      ? (_copy ? '复制到' : widget.title)
-                      : widget.title,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Icon(Icons.close, size: 22, color: AppColors.ink3),
-                ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              if (widget.allowCopy) ...[
+                const SizedBox(height: 14),
+                _buildModeSwitch(),
               ],
-            ),
-            const SizedBox(height: 12),
-            if (widget.allowCopy) ...[
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: AppColors.bg,
-                  border: Border.all(color: AppColors.line),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    _modeBtn('移动', false),
-                    _modeBtn('复制', true),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Text(
-              _pathText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, color: AppColors.ink3),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 260,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _folders.isEmpty
-                      ? Center(
-                          child: Text(
-                            '该文件夹下没有子文件夹',
-                            style: TextStyle(
-                                fontSize: 13, color: AppColors.ink3),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: _folders.length,
-                          separatorBuilder: (_, __) =>
-                              Divider(height: 1, color: AppColors.line),
-                          itemBuilder: (context, index) {
-                            final folder = _folders[index];
-                            return InkWell(
-                              onTap: () => _enter(folder),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 11),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.folder_rounded,
-                                        size: 22, color: AppColors.primary),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        folder.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            color: AppColors.ink),
+              const SizedBox(height: 14),
+              _buildBreadcrumb(),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 260,
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _folders.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.folder_off_outlined,
+                                    size: 34, color: AppColors.ink3),
+                                const SizedBox(height: 8),
+                                Text('该文件夹下没有子文件夹',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.ink3)),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _folders.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(height: 1, color: AppColors.line),
+                            itemBuilder: (context, index) {
+                              final folder = _folders[index];
+                              return InkWell(
+                                onTap: () => _enter(folder),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 11),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.folder_rounded,
+                                          size: 22, color: AppColors.primary),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          folder.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 14,
+                                              color: AppColors.ink),
+                                        ),
                                       ),
-                                    ),
-                                    Icon(Icons.chevron_right,
-                                        size: 20, color: AppColors.ink3),
-                                  ],
+                                      Icon(Icons.chevron_right,
+                                          size: 20, color: AppColors.ink3),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (_canGoUp)
-                  TextButton.icon(
-                    onPressed: _goUp,
-                    icon: Icon(Icons.arrow_upward,
-                        size: 17, color: AppColors.ink2),
-                    label: const Text('上一级'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.ink2,
-                    ),
-                  )
-                else
-                  const SizedBox.shrink(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('取消'),
-                    ),
-                    const SizedBox(width: 6),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(
-                        context,
-                        MovePickResult(copy: _copy, uri: _currentUri),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        textStyle: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                      child: Text(
-                        widget.allowCopy
-                            ? (_copy ? '复制到此' : widget.confirmLabel)
-                            : widget.confirmLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.visible,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                              );
+                            },
+                          ),
+              ),
+              const SizedBox(height: 14),
+              _buildBottomBar(),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// 标题栏 + 关闭按钮
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        Text(
+          widget.allowCopy ? (_copy ? '复制到' : widget.title) : widget.title,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ink,
+          ),
+        ),
+        const Spacer(),
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child:
+                Icon(Icons.close, size: 22, color: AppColors.ink3),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 移动 / 复制模式切换
+  Widget _buildModeSwitch() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          _modeBtn('移动', false),
+          _modeBtn('复制', true),
+        ],
       ),
     );
   }
@@ -312,6 +292,97 @@ class _FolderPickerDialogState extends State<_FolderPickerDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 可点击跳转的面包屑：每个层级可点选返回
+  Widget _buildBreadcrumb() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _crumbChip(
+            label: '我的存储',
+            active: _crumbs.isEmpty,
+            onTap: () => _jumpTo(-1),
+          ),
+          for (var i = 0; i < _crumbs.length; i++) ...[
+            _crumbArrow(),
+            _crumbChip(
+              label: _crumbs[i].name,
+              active: i == _crumbs.length - 1,
+              onTap: () => _jumpTo(i),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _crumbArrow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Icon(Icons.chevron_right, size: 15, color: AppColors.ink3),
+    );
+  }
+
+  Widget _crumbChip(
+      {required String label, required bool active, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: active ? null : onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+            color: active ? AppColors.ink3 : AppColors.primary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 底部：上一级 + 确认
+  Widget _buildBottomBar() {
+    return Row(
+      children: [
+        if (_canGoUp)
+          TextButton.icon(
+            onPressed: _goUp,
+            icon: Icon(Icons.arrow_upward, size: 17, color: AppColors.ink2),
+            label: const Text('上一级'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.ink2,
+              visualDensity: VisualDensity.compact,
+            ),
+          )
+        else
+          const SizedBox.shrink(),
+        const Spacer(),
+        TextButton(
+          onPressed: () => Navigator.pop(
+            context,
+            MovePickResult(copy: _copy, uri: _currentUri),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            textStyle:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+          child: Text(
+            widget.allowCopy
+                ? (_copy ? '复制到此' : widget.confirmLabel)
+                : widget.confirmLabel,
+          ),
+        ),
+      ],
     );
   }
 }
