@@ -39,9 +39,14 @@ class DioUtil {
 
   /// 标准认证头（Cloudreve 默认读取，Bearer 前缀必须有）
   static const String authHeaderName = 'Authorization';
-  /// 兼容自定义认证头：部分自建站点把认证头改成了 X-Cloudreve-Token，
-  /// 两个头同时携带，服务端按自己读取的那个认证即可
+  /// 兼容自定义认证头：部分自建站点（含 ModelScope 托管实例）把认证头改成
+  /// X-Cloudreve-Token，两个头同时携带，服务端按自己读取的那个认证即可
   static const String altAuthHeaderName = 'X-Cloudreve-Token';
+
+  /// 确认走 ModelScope 网关的站点（基础 URL 集合）：这些站点会拦截
+  /// Authorization 头（当作 SDK Token 校验返回 403），后续请求只发
+  /// X-Cloudreve-Token（与浏览器一致）。首次 403 自动降级后记录，避免每次重试。
+  static final Set<String> _modelScopeSites = {};
 
   /// 初始化
   DioUtil._internal() {
@@ -80,7 +85,13 @@ class DioUtil {
     final isTokenEndpoint = options.path.contains('/session/token');
     final token = await TokenManager.getAccessToken();
     if (token.isNotEmpty && !isTokenEndpoint) {
-      options.headers[authHeaderName] = 'Bearer $token';
+      // ModelScope 网关会把 Authorization 当作 SDK Token 拦截（403）：
+      // 已确认的 ModelScope 站点或降级重试请求，只发 X-Cloudreve-Token（与浏览器一致）。
+      final skipAuth = _modelScopeSites.contains(baseUrl) ||
+          options.extra['_skipAuthRetry'] == true;
+      if (!skipAuth) {
+        options.headers[authHeaderName] = 'Bearer $token';
+      }
       options.headers[altAuthHeaderName] = 'Bearer $token';
     }
     handler.next(options);
@@ -118,9 +129,27 @@ class DioUtil {
         error.requestOptions.path.contains('/session/token');
     if (isAuthExpired && !isTokenEndpoint) {
       _retryWithRefresh(error, handler);
-    } else {
-      handler.next(error);
+      return;
     }
+    // ModelScope 网关 403：Authorization 头被拦截（当成 SDK Token 校验）。
+    // 去掉 Authorization 头重试（只发 X-Cloudreve-Token），并把该站点记入
+    // _modelScopeSites，后续请求直接不发 Authorization，避免每次先 403 再重试。
+    if (resp?.data is Map &&
+        resp?.data['Code'] == 10010101007 &&
+        error.requestOptions.extra['_skipAuthRetry'] != true) {
+      final opts = error.requestOptions;
+      _modelScopeSites.add(opts.baseUrl);
+      opts.headers.remove(authHeaderName);
+      opts.extra['_skipAuthRetry'] = true;
+      _dio.fetch(opts).then(
+        (r) => handler.resolve(r),
+        onError: (Object e) {
+          if (e is DioException) handler.next(e);
+        },
+      );
+      return;
+    }
+    handler.next(error);
   }
 
   /// 刷新 token 后重放原请求
