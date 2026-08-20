@@ -239,7 +239,11 @@ class _SecurityPageState extends State<SecurityPage> {
                   Switch(
                     value: _fpGuard,
                     onChanged: _toggleGuard,
-                    activeColor: AppColors.primary,
+                    // 选中态品牌蓝底白点，未选中浅灰底白点，与整体配色统一
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: AppColors.primary,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: AppColors.line,
                   ),
                 ],
               ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/config/SlideUpPageRoute.dart';
+import 'package:cloudpavilion/page/login/login.dart';
 import 'package:cloudpavilion/util/AuthState.dart';
 import 'package:cloudpavilion/util/AudioPlayerService.dart';
 import 'package:cloudpavilion/util/FingerprintService.dart';
@@ -54,7 +56,10 @@ class _UsersState extends State<Users> {
               actions: [
                 IconTile(
                   icon: Icons.add,
-                  onTap: () => Navigator.pushNamed(context, "/home"),
+                  onTap: () => Navigator.push(
+                    context,
+                    SlideUpPageRoute(const Login(showBack: true)),
+                  ),
                 ),
               ],
             ),

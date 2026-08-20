@@ -19,7 +19,11 @@ import '../../config/SlideUpPageRoute.dart';
 
 /// 登录页（站点绑定 + 账号密码登录合并单页）
 class Login extends StatefulWidget {
-  Login({super.key});
+  const Login({super.key, this.showBack = false});
+
+  /// 是否为「从账户管理 / 绑定新站点等二级入口」打开：
+  /// 只有这种情况才在左上角显示返回箭头；首次进入/登出后进入不显示
+  final bool showBack;
 
   @override
   State<Login> createState() => _LoginState();
@@ -47,117 +51,128 @@ class _LoginState extends State<Login> {
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: pagePad),
-              child: Column(
-                children: <Widget>[
-                  SizedBox(
-                      height: MediaQuery.of(context).padding.top + 6),
-                  if (Navigator.canPop(context))
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconTile(
-                        icon: Icons.arrow_back_ios_new,
-                        filled: false,
-                        compact: true,
-                        onTap: () => Navigator.pop(context),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final padTop = MediaQuery.of(context).padding.top;
+                return SingleChildScrollView(
+                  // 上边距含状态栏；整体垂直居中，避免顶部过挤、底部空太多
+                  padding: EdgeInsets.fromLTRB(
+                      pagePad, padTop + 16, pagePad, 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - padTop - 40),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        children: [
+                          if (widget.showBack)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: IconTile(
+                                icon: Icons.arrow_back_ios_new,
+                                filled: false,
+                                compact: true,
+                                onTap: () => Navigator.pop(context),
+                              ),
+                            ),
+                          const Spacer(),
+                          _LogoMark(size: 58),
+                          const SizedBox(height: 16),
+                          Text(
+                            _siteName,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 26),
+                          // 站点地址
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '站点地址',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _LoginField(
+                            icon: Icons.public,
+                            hintText: 'https://your-site.com',
+                            controller: _siteAddrController,
+                            keyboardType: TextInputType.url,
+                          ),
+                          const SizedBox(height: 16),
+                          // 邮箱
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '邮箱',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _LoginField(
+                            icon: Icons.email_outlined,
+                            hintText: '用户邮箱',
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+                          // 密码
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '密码',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _LoginField(
+                            icon: Icons.lock_outline,
+                            hintText: '登录密码',
+                            controller: _passwordController,
+                            obscure: true,
+                            keyboardType: TextInputType.visiblePassword,
+                          ),
+                          const SizedBox(height: 18),
+                          PillButton(
+                            label: '登录',
+                            onPressed: () => login(context),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GhostButton(
+                                label: '多账号管理',
+                                icon: Icons.switch_account_rounded,
+                                onPressed: () {
+                                  Navigator.push(
+                                      context, SlideUpPageRoute(Users()));
+                                },
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                        ],
                       ),
                     ),
-                  const SizedBox(height: 20),
-                  _LogoMark(size: 58),
-                  const SizedBox(height: 16),
-                  Text(
-                    _siteName,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
-                      color: AppColors.ink,
-                    ),
                   ),
-                  const SizedBox(height: 26),
-                  // 站点地址
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '站点地址',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _LoginField(
-                    icon: Icons.public,
-                    hintText: 'https://your-site.com',
-                    controller: _siteAddrController,
-                    keyboardType: TextInputType.url,
-                  ),
-                  const SizedBox(height: 16),
-                  // 邮箱
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '邮箱',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _LoginField(
-                    icon: Icons.email_outlined,
-                    hintText: '用户邮箱',
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  // 密码
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '密码',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _LoginField(
-                    icon: Icons.lock_outline,
-                    hintText: '登录密码',
-                    controller: _passwordController,
-                    obscure: true,
-                    keyboardType: TextInputType.visiblePassword,
-                  ),
-                  const SizedBox(height: 18),
-                  PillButton(
-                    label: '登录',
-                    onPressed: () => login(context),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      GhostButton(
-                        label: '多账号管理',
-                        icon: Icons.switch_account_rounded,
-                        onPressed: () {
-                          Navigator.push(
-                              context, SlideUpPageRoute(Users()));
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ],

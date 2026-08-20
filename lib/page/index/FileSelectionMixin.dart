@@ -136,6 +136,14 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
               const SizedBox(height: 6),
               const SheetHandle(),
               const SizedBox(height: 16),
+              Text(
+                '更多操作',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink3),
+              ),
+              const SizedBox(height: 8),
               ListTile(
                 leading:
                     Icon(Icons.drive_file_rename_outline, color: AppColors.primary),
