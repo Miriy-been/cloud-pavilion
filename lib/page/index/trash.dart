@@ -94,22 +94,11 @@ class _TrashPageState extends State<TrashPage> {
   }
 
   Future<bool?> _confirm(String title, String content) {
-    return showDialog<bool>(
+    return showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(content),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: title,
+      content: content,
+      danger: true,
     );
   }
 

@@ -75,25 +75,15 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
           .showSnackBar(appSnack('当前没有可清理的缓存'));
       return;
     }
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('清除缓存'),
-        content: Text('将清除 ${formatBytes(size)} 缓存（图片缩略图、已缓存的音乐等），'
-            '清除后下次打开会自动重新加载。确定清除吗？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('清除'),
-          ),
-        ],
-      ),
+      title: '清除缓存',
+      content: '将清除 ${formatBytes(size)} 缓存（图片缩略图、已缓存的音乐等），'
+          '清除后下次打开会自动重新加载。确定清除吗？',
+      confirmText: '清除',
+      danger: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     final freed = await AppCache.clearAllCache();
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -220,12 +210,14 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const SheetHandle(),
+              const SizedBox(height: 12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.asset(
@@ -573,25 +565,13 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
         .invokeMethod<Map<dynamic, dynamic>>('ensureAppDownloadDir');
     if (res != null && res['ok'] == true) return true;
     if (res == null || res['needPermission'] != true) return true;
-    final go = await showDialog<bool>(
+    final go = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('需要权限'),
-        content: const Text(
-            '保存到 /storage/emulated/0/cloudreve 需要开启「所有文件访问」权限，是否前往设置开启？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('去授权'),
-          ),
-        ],
-      ),
+      title: '需要权限',
+      content: '保存到 /storage/emulated/0/cloudreve 需要开启「所有文件访问」权限，是否前往设置开启？',
+      confirmText: '去授权',
     );
-    if (go == true) {
+    if (go) {
       _downloadsChannel.invokeMethod('openAllFilesAccess');
       return true;
     }
@@ -600,24 +580,14 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
 
   /// 退出登录确认
   Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认'),
-        content: const Text('你确认要退出登录吗？\n所有正在运行中的任务，比如上传 / 下载均会停止'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('退出登录'),
-          ),
-        ],
-      ),
+      title: '退出登录',
+      content: '你确认要退出登录吗？\n所有正在运行中的任务，比如上传 / 下载均会停止',
+      confirmText: '退出登录',
+      danger: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     // 停止后台播放的音乐
     AudioPlayerService.instance.stop();
     // 停止 token 定时自动刷新

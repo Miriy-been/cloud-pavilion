@@ -11,7 +11,10 @@ import 'SpUtils.dart';
 
 /// 后台上传任务管理器（全局单例）
 /// 上传在后台执行，不阻塞页面；任务增删 / 状态变化时通知监听者，
-/// 进度高频回调时进行节流通知
+/// 进度高频回调时进行节流通知。
+/// 多文件支持**并行上传**：按队列依次分发，同时最多并行 _maxConcurrent 个（默认 5，
+/// 可自定义 1~20）。排队中的任务状态同为「上传中」，但一次只启动限定的并发数，
+/// 避免一次性并发过多导致服务端报错。
 class UploadManager extends ChangeNotifier {
   UploadManager._();
   static final UploadManager instance = UploadManager._();
@@ -30,6 +33,23 @@ class UploadManager extends ChangeNotifier {
 
   final List<UploadTaskModel> tasks = [];
   final Map<UploadTaskModel, CancelToken> _tokens = {};
+
+  /// 每个任务当前创建的上传会话（session_id），用于取消 / 失败时释放服务器端占用的名称
+  final Map<UploadTaskModel, String> _sessions = {};
+
+  /// 待处理（含排队等待）的上传任务
+  final List<UploadTaskModel> _queue = [];
+
+  /// 当前正在并发上传的任务数
+  int _running = 0;
+
+  /// 最大并行上传数量（默认 5，可自定义 1~20）
+  int _maxConcurrent = 5;
+
+  int get maxConcurrent => _maxConcurrent;
+
+  /// 每个任务的上传速度计算状态
+  final Map<UploadTaskModel, _SpeedState> _speed = {};
 
   /// 进度节流：上次通知时间
   DateTime _lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
@@ -52,6 +72,9 @@ class UploadManager extends ChangeNotifier {
 
   /// 恢复历史任务记录（应用启动 / 切换账号时调用）
   Future<void> restore() async {
+    // 加载自定义并行数量（全局设置）
+    final saved = await SpUtils.getInt('uploadConcurrency', 5);
+    _maxConcurrent = saved.clamp(1, 20).toInt();
     final raw = await SpUtils.getString(await _tasksKey());
     if (raw.isEmpty) return;
     try {
@@ -88,6 +111,9 @@ class UploadManager extends ChangeNotifier {
       }
     }
     tasks.clear();
+    _queue.clear();
+    _speed.clear();
+    _sessions.clear();
     notifyListeners();
     await restore();
   }
@@ -95,10 +121,12 @@ class UploadManager extends ChangeNotifier {
   /// 清空已完成 / 已取消 / 失败的历史记录（保留进行中的任务）
   Future<void> clearFinished() async {
     tasks.removeWhere((t) => t.status != UploadStatus.uploading);
+    _speed.removeWhere((t, _) => t.status != UploadStatus.uploading);
+    _sessions.removeWhere((t, _) => t.status != UploadStatus.uploading);
     _notifyImmediate();
   }
 
-  /// 开始上传一个文件（后台执行）
+  /// 开始上传一个文件（后台执行，加入队列，由并行分发器按并发数调度）
   Future<void> startUpload({
     required String name,
     required String uri,
@@ -112,15 +140,17 @@ class UploadManager extends ChangeNotifier {
       size: size,
     );
     tasks.add(task);
+    _queue.add(task);
     _notifyImmediate();
-    await _runUpload(task);
+    _pump();
   }
 
-  /// 取消上传任务
+  /// 取消上传任务（排队中的任务被跳过，进行中的任务中断）
   void cancel(UploadTaskModel task) {
     if (task.status != UploadStatus.uploading) return;
     task.status = UploadStatus.cancelled;
     _tokens.remove(task)?.cancel();
+    _speed.remove(task);
     _notifyImmediate();
   }
 
@@ -130,18 +160,82 @@ class UploadManager extends ChangeNotifier {
     task.status = UploadStatus.uploading;
     task.error = null;
     task.progress = 0;
+    task.uploaded = 0;
+    task.speed = 0;
     _notifyImmediate();
-    await _runUpload(task);
+    _queue.add(task);
+    _pump();
+  }
+
+  /// 并行分发队列：在未达到并发上限时，从队列取出任务开始上传。
+  /// 每个任务上传结束（含失败 / 取消）后自动补跑一次，继续填满并发额度。
+  void _pump() {
+    while (_queue.isNotEmpty && _running < _maxConcurrent) {
+      final task = _queue.removeAt(0);
+      // 排队期间可能被取消（换个账号 / 用户主动取消），此时跳过
+      if (task.status != UploadStatus.uploading) continue;
+      _running++;
+      _runUpload(task).whenComplete(() {
+        _running--;
+        _pump();
+      });
+    }
+  }
+
+  /// 设置最大并行上传数量（1~20），持久化并立即应用
+  void setMaxConcurrent(int n) {
+    final v = n.clamp(1, 20).toInt();
+    if (v == _maxConcurrent) return;
+    _maxConcurrent = v;
+    SpUtils.setInt('uploadConcurrency', _maxConcurrent);
+    notifyListeners();
+    // 并发数调大时，让仍排队的任务立即补位；调小时无需干预（自动限流）
+    _pump();
+  }
+
+  /// 更新任务已上传字节数与实时速度（并节流通知）
+  void _updateProgress(UploadTaskModel task, int uploaded) {
+    task.uploaded = uploaded;
+    final s = _speed[task] ??= _SpeedState();
+    final now = DateTime.now();
+    final dt = now.difference(s.lastTime).inMilliseconds;
+    if (dt >= 400) {
+      final delta = (uploaded - s.lastBytes) / (dt / 1000);
+      // 指数滑动平均：平滑抖动，实时反馈当前速率
+      s.speed = s.speed > 0 ? s.speed * 0.7 + delta * 0.3 : delta;
+      s.lastBytes = uploaded.toDouble();
+      s.lastTime = now;
+      task.speed = s.speed;
+    }
+    _notifyThrottled();
+  }
+
+  /// 通知服务器释放指定任务的上传会话（取消 / 失败后调用）。
+  /// 若不上报，目标名称持续被服务器占用，重试或再次上传同名文件会提示「同名对象已存在」。
+  /// 已完成的上传不调用（会话已结束，无需释放）。
+  void _releaseSession(UploadTaskModel task, {int delayMs = 0}) {
+    final sessionId = _sessions.remove(task);
+    if (sessionId == null || sessionId.isEmpty) return;
+    // 取消时稍作延迟，等本地中断的请求先松开，避免与服务端处理冲突
+    Future.delayed(Duration(milliseconds: delayMs), () async {
+      try {
+        await FileApi.deleteUploadSession(sessionId, task.uri);
+      } catch (_) {
+        // 释放失败不阻塞：残留会话由服务端 TTL 过期自动回收
+      }
+    });
   }
 
   Future<void> _runUpload(UploadTaskModel task) async {
     final token = CancelToken();
     _tokens[task] = token;
+    _speed[task] = _SpeedState();
     final f = File(task.sourcePath);
     try {
       final session = await FileApi.createUploadSession(task.uri, task.size);
       final sessionId = session['session_id'] as String;
       final chunkSize = (session['chunk_size'] ?? 0) as int;
+      _sessions[task] = sessionId;
 
       if (chunkSize <= 0) {
         // 不分片：整文件作为 index 0 一次上传
@@ -153,7 +247,7 @@ class UploadManager extends ChangeNotifier {
           cancelToken: token,
           onSendProgress: (sent, total) {
             task.progress = total > 0 ? sent / total : 0;
-            _notifyThrottled();
+            _updateProgress(task, sent);
           },
         );
       } else {
@@ -167,12 +261,25 @@ class UploadManager extends ChangeNotifier {
                 : chunkSize;
             await raf.setPosition(offset);
             final bytes = await raf.read(len);
-            await FileApi.uploadChunk(sessionId, index, bytes,
-                cancelToken: token);
+            // 分片内实时回调：chunk_size 可能很大（一个大分片即整段上传），
+            // 若不传 onSendProgress，进度只能在该分片整体完成后更新一次，
+            // 表现为进度条长期停留在 0% 直到最后直接变成「上传完成」。
+            // 用 offset + sent 折算全局已上传字节，保证整个上传过程实时刷新。
+            await FileApi.uploadChunk(
+              sessionId,
+              index,
+              bytes,
+              cancelToken: token,
+              onSendProgress: (sent, _) {
+                task.progress =
+                    task.size > 0 ? (offset + sent) / task.size : 0;
+                _updateProgress(task, offset + sent);
+              },
+            );
             offset += len;
             index++;
             task.progress = offset / task.size;
-            _notifyThrottled();
+            _updateProgress(task, offset);
           }
         } finally {
           await raf.close();
@@ -180,23 +287,39 @@ class UploadManager extends ChangeNotifier {
       }
       task.status = UploadStatus.finished;
       task.progress = 1;
+      task.uploaded = task.size;
+      task.speed = 0;
       // 上传完成：文件列表缓存失效，返回目录时可见新文件
       FileApi.invalidateListCache();
     } on DioException catch (e) {
       if (CancelToken.isCancel(e)) {
         task.status = UploadStatus.cancelled;
+        // 用户取消：释放服务器会话，避免同名文件重试时提示「同名对象已存在」
+        _releaseSession(task, delayMs: 500);
       } else {
         task.status = UploadStatus.failed;
-        task.error = e.toString();
-        SmartDialog.showToast('上传「${task.name}」失败：${errorText(e, '网络错误')}');
+        task.error = errorText(e, '网络错误');
+        // 上传失败：释放会话，让重试可以重新创建同名会话
+        _releaseSession(task);
+        SmartDialog.showToast('上传「${task.name}」失败：${task.error}');
       }
     } catch (e) {
       task.status = UploadStatus.failed;
-      task.error = e.toString();
-      SmartDialog.showToast('上传「${task.name}」失败：${errorText(e, '未知错误')}');
+      task.error = errorText(e, '未知错误');
+      _releaseSession(task);
+      SmartDialog.showToast('上传「${task.name}」失败：${task.error}');
     } finally {
       _tokens.remove(task);
+      _speed.remove(task);
+      _sessions.remove(task); // 上传成功时仅清引用，不删服务端会话
       _notifyImmediate();
     }
   }
+}
+
+/// 单个任务的实时速度计算状态
+class _SpeedState {
+  double lastBytes = 0;
+  DateTime lastTime = DateTime.now();
+  double speed = 0;
 }

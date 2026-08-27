@@ -195,24 +195,13 @@ class _PreviewPageState extends State<PreviewPage> {
 
   /// 删除当前文件（进回收站，返回列表）
   Future<void> _deleteCurrent() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除'),
-        content: Text('确定将「${_current.name}」移入回收站吗？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: '删除',
+      content: '确定将「${_current.name}」移入回收站吗？',
+      danger: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await FileApi.deleteFiles([_current.path]);
       if (!mounted) return;
@@ -399,24 +388,12 @@ class _PreviewPageState extends State<PreviewPage> {
 
   /// 重命名输入弹窗
   Future<String?> _promptRename() {
-    final controller = TextEditingController(text: _current.name);
-    return showDialog<String>(
+    return showAppInput(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '输入新名称'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('确定')),
-        ],
-      ),
+      title: '重命名',
+      label: '新名称',
+      hint: '输入新名称',
+      initial: _current.name,
     );
   }
 

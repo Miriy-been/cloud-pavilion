@@ -316,44 +316,21 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
 
   /// 输入弹窗，返回输入内容（取消返回 null）
   Future<String?> showInputDialog(String title, String hint,
-      {String? initial}) async {
-    final controller = TextEditingController(text: initial ?? '');
-    return showDialog<String>(
+      {String? initial}) {
+    return showAppInput(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(hintText: hint),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('确定')),
-        ],
-      ),
+      title: title,
+      label: hint,
+      initial: initial,
     );
   }
 
   /// 确认弹窗
   Future<bool?> showConfirmDialog(String title, String content) {
-    return showDialog<bool>(
+    return showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(content),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('确定')),
-        ],
-      ),
+      title: title,
+      content: content,
     );
   }
 }

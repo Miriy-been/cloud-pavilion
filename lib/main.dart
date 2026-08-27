@@ -63,6 +63,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 首帧后设置 Android 多任务卡片显示应用正式名称「云阁」（非阻塞，
+    // 不放在 main() 中 await，避免平台通道未就绪导致启动卡在首帧）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SystemChrome.setApplicationSwitcherDescription(
+          const ApplicationSwitcherDescription(label: '云阁'));
+    });
     // 恢复本地主题模式
     ThemeController.load().then((_) {
       _mode = ThemeController.mode.value;
@@ -96,7 +102,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       toastBuilder: (String msg) => CustomToast(msg),
     );
     return MaterialApp(
-      title: 'FlutterReve',
+      title: '云阁',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _mode,

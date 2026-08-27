@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
+import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/model/FileItemModel.dart';
 
 /// 移动/复制选择结果
@@ -144,16 +145,18 @@ class _FolderPickerDialogState extends State<_FolderPickerDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 380),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Center(child: SheetHandle()),
+              const SizedBox(height: 12),
               _buildHeader(),
               if (widget.allowCopy) ...[
                 const SizedBox(height: 14),

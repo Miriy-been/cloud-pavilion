@@ -21,8 +21,15 @@ Future<ShareParams?> showShareDialog(BuildContext context, String fileName) {
       final passwordController = TextEditingController();
       final remainController = TextEditingController();
       return StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('创建分享'),
+        builder: (ctx, setState) => AppDialogCard(
+          header: Text(
+            '创建分享',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -100,10 +107,13 @@ Future<ShareParams?> showShareDialog(BuildContext context, String fileName) {
             ),
           ),
           actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('取消')),
-            TextButton(
+            AppDialogButton(
+              label: '取消',
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            AppDialogButton(
+              label: '创建',
+              primary: true,
               onPressed: () => Navigator.pop(
                 ctx,
                 ShareParams(
@@ -114,7 +124,6 @@ Future<ShareParams?> showShareDialog(BuildContext context, String fileName) {
                       : null,
                 ),
               ),
-              child: const Text('创建'),
             ),
           ],
         ),

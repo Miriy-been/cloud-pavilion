@@ -43,6 +43,8 @@ class CustomToast extends StatelessWidget {
           child: Container(
             margin: EdgeInsets.only(bottom: 30),
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            constraints:
+                BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
             decoration: BoxDecoration(
                 color: bg,
                 borderRadius: BorderRadius.circular(100),
@@ -54,18 +56,23 @@ class CustomToast extends StatelessWidget {
                       spreadRadius: 0.5 //阴影扩散程度
                       )
                 ]),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              //icon
-              Container(
-                margin: EdgeInsets.only(right: 15),
-                child: Icon(icon, color: fg),
-              ),
-
-              //msg
-              Text('$msg',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: fg)),
-            ]),
+            child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  //icon
+                  Container(
+                    margin: EdgeInsets.only(right: 12),
+                    child: Icon(icon, color: fg),
+                  ),
+                  //msg：限宽 + 省略号，避免长错误信息撑爆屏幕（RenderFlex overflow）
+                  Flexible(
+                    child: Text(msg,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: fg)),
+                  ),
+                ]),
           ),
         )
       ],

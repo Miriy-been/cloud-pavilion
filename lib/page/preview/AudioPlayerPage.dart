@@ -95,24 +95,13 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   /// 批量删除（进回收站）
   Future<void> _batchDelete() async {
     final items = _selected.toList();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除'),
-        content: Text('确定将选中的 ${items.length} 首歌曲移入回收站吗？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: '删除',
+      content: '确定将选中的 ${items.length} 首歌曲移入回收站吗？',
+      danger: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await FileApi.deleteFiles(items.map((e) => e.path).toList());
     } catch (e) {

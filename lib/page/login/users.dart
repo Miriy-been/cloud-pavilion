@@ -256,24 +256,14 @@ class _UsersState extends State<Users> {
         (data['data']?['nickname'] ?? data['userName'] ?? '').toString();
     final siteUrl = (data['siteUrl'] ?? '').toString();
     final userName = (data['userName'] ?? '').toString();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除账号'),
-        content: Text('确定移除「$nickname」的本地登录记录吗？\n删除后再次登录需重新输入密码。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+      title: '删除账号',
+      content: '确定移除「$nickname」的本地登录记录吗？\n删除后再次登录需重新输入密码。',
+      confirmText: '删除',
+      danger: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     // 从本地账号快照移除该账号
     final accounts = await SpUtils.getStringList('accounts');

@@ -57,7 +57,7 @@ class UpdateChecker {
         SpUtils.setInt(
             _lastPromptKey, DateTime.now().millisecondsSinceEpoch);
         if (context == null || !context.mounted) return;
-        await _showUpdateSheet(context, data, tag, current);
+        await _showUpdateDialog(context, data, tag, current);
       } else if (manual && context != null && context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(appSnack('当前已是最新版本 v$current'));
@@ -111,130 +111,120 @@ class UpdateChecker {
     return null;
   }
 
-  /// 更新提示弹窗（底部弹窗，与全局弹窗风格统一）
-  static Future<void> _showUpdateSheet(
+  /// 更新提示弹窗（居中弹窗，与全局弹窗风格统一）
+  static Future<void> _showUpdateDialog(
       BuildContext context, Map data, String tag, String current) async {
     final body = (data['body']?.toString() ?? '').trim();
     final apkUrl = _apkUrl(data);
     final target = apkUrl ?? _releasesPage;
 
-    await showModalBottomSheet(
+    await showDialog<void>(
       context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        final maxHeight = MediaQuery.of(ctx).size.height * 0.75;
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
-            child: Padding(
-              padding: const EdgeInsets.all(pagePad),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(pagePad, 14, pagePad, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(child: SheetHandle()),
+              const SizedBox(height: 16),
+              Row(
                 children: [
-                  const SizedBox(height: 6),
-                  const SheetHandle(),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: AppColors.primarySoft,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.system_update_alt,
-                            size: 22, color: AppColors.primary),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '发现新版本 v$tag',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '当前版本 v$current',
-                              style: TextStyle(
-                                  fontSize: 12.5, color: AppColors.ink3),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (body.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    // 更新说明（限高滚动，防长文本溢出）
-                    Container(
-                      width: double.infinity,
-                      constraints: BoxConstraints(maxHeight: maxHeight * 0.45),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.bg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          body,
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.55,
-                            color: AppColors.ink2,
-                          ),
-                        ),
-                      ),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.ink2,
-                            side: BorderSide(color: AppColors.line),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Icon(Icons.system_update_alt,
+                        size: 22, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '发现新版本 v$tag',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
                           ),
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('稍后提醒'),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            launchUrl(Uri.parse(target),
-                                mode: LaunchMode.externalApplication);
-                          },
-                          child: const Text('立即更新'),
+                        const SizedBox(height: 3),
+                        Text(
+                          '当前版本 v$current',
+                          style: TextStyle(
+                              fontSize: 12.5, color: AppColors.ink3),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                // 更新说明（限高滚动，防长文本溢出）
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      body,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.55,
+                        color: AppColors.ink2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.ink2,
+                        side: BorderSide(color: AppColors.line),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('稍后提醒'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        launchUrl(Uri.parse(target),
+                            mode: LaunchMode.externalApplication);
+                      },
+                      child: const Text('立即更新'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

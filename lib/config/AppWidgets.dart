@@ -673,6 +673,252 @@ class GhostButton extends StatelessWidget {
   }
 }
 
+/// 居中弹窗统一外壳：圆角 24 + surface 底 + 顶部手柄
+///
+/// 与 App 更新提示弹窗风格统一，供确认 / 输入及各类页面弹窗复用。
+/// [header] 标题区（可选，如标题 / 图标 + 标题行）；[content] 弹窗主体；
+/// [actions] 底部按钮（横向等宽排列，按钮间间隔 12）。
+class AppDialogCard extends StatelessWidget {
+  final Widget? header;
+  final Widget? content;
+  final List<Widget> actions;
+
+  const AppDialogCard({
+    super.key,
+    this.header,
+    this.content,
+    this.actions = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(pagePad, 14, pagePad, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(child: SheetHandle()),
+            if (header != null) ...[
+              const SizedBox(height: 16),
+              header!,
+            ],
+            if (content != null) ...[
+              const SizedBox(height: 14),
+              content!,
+            ],
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  for (var i = 0; i < actions.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 12),
+                    Expanded(child: actions[i]),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 统一弹窗按钮：描边（次级）或实心（主色 / 危险红）
+class AppDialogButton extends StatelessWidget {
+  final String label;
+
+  /// 实心主色按钮（默认 false = 描边次级按钮）
+  final bool primary;
+
+  /// 危险操作：实心红按钮（仅 [primary] 生效）
+  final bool danger;
+
+  final VoidCallback? onPressed;
+
+  const AppDialogButton({
+    super.key,
+    required this.label,
+    this.primary = false,
+    this.danger = false,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (primary) {
+      return FilledButton(
+        style: FilledButton.styleFrom(
+          backgroundColor: danger ? AppColors.danger : AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        onPressed: onPressed,
+        child: Text(label),
+      );
+    }
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.ink2,
+        side: BorderSide(color: AppColors.line),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+      onPressed: onPressed,
+      child: Text(label),
+    );
+  }
+}
+
+/// 统一确认弹窗（居中，风格与更新提示一致）
+/// [danger] 确认按钮用危险红；返回 true 表示确认。
+Future<bool> showAppConfirm({
+  required BuildContext context,
+  required String title,
+  required String content,
+  String cancelText = '取消',
+  String confirmText = '确定',
+  bool danger = false,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AppDialogCard(
+      header: Text(
+        title,
+        style: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          color: AppColors.ink,
+        ),
+      ),
+      content: Text(
+        content,
+        style: TextStyle(
+          fontSize: 14,
+          height: 1.5,
+          color: AppColors.ink2,
+        ),
+      ),
+      actions: [
+        AppDialogButton(
+          label: cancelText,
+          onPressed: () => Navigator.pop(ctx, false),
+        ),
+        AppDialogButton(
+          label: confirmText,
+          primary: true,
+          danger: danger,
+          onPressed: () => Navigator.pop(ctx, true),
+        ),
+      ],
+    ),
+  );
+  return ok ?? false;
+}
+
+/// 统一单行输入弹窗（居中，风格与更新提示一致）
+/// 返回输入内容（取消返回 null）
+///
+/// controller 由 [_AppInputDialog] 自持并在其 dispose 中释放，
+/// 避免在弹窗退场动画期间提前 dispose 导致框架断言崩溃。
+Future<String?> showAppInput({
+  required BuildContext context,
+  required String title,
+  String label = '',
+  String? hint,
+  String? initial,
+  bool autofocus = true,
+  String confirmText = '确定',
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (_) => _AppInputDialog(
+      title: title,
+      label: label,
+      hint: hint,
+      initial: initial,
+      autofocus: autofocus,
+      confirmText: confirmText,
+    ),
+  );
+}
+
+/// 输入弹窗主体（StatefulWidget 持有 controller，随弹窗销毁时释放）
+class _AppInputDialog extends StatefulWidget {
+  final String title;
+  final String label;
+  final String? hint;
+  final String? initial;
+  final bool autofocus;
+  final String confirmText;
+
+  const _AppInputDialog({
+    required this.title,
+    this.label = '',
+    this.hint,
+    this.initial,
+    this.autofocus = true,
+    this.confirmText = '确定',
+  });
+
+  @override
+  State<_AppInputDialog> createState() => _AppInputDialogState();
+}
+
+class _AppInputDialogState extends State<_AppInputDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.pop(context, _controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDialogCard(
+      header: Text(
+        widget.title,
+        style: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          color: AppColors.ink,
+        ),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: widget.autofocus,
+        decoration: appFieldDecoration(widget.label, hint: widget.hint),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        AppDialogButton(
+          label: '取消',
+          onPressed: () => Navigator.pop(context),
+        ),
+        AppDialogButton(
+          label: widget.confirmText,
+          primary: true,
+          onPressed: _submit,
+        ),
+      ],
+    );
+  }
+}
+
 /// 分区标签（灰色小标题 + 右侧内容）
 class SectionHeader extends StatelessWidget {
   final String title;

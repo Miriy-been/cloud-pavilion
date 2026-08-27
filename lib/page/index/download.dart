@@ -37,6 +37,73 @@ class _DownloadState extends State<Download>
     UploadManager.instance.notifyListeners();
   }
 
+  /// 弹出「并行上传数量」设置弹窗（参考网页版的并发设置，1~20）
+  void _showConcurrencySheet() {
+    var value = UploadManager.instance.maxConcurrent;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AppDialogCard(
+          header: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '并行上传数量',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '同时上传的任务数（1~20），调大可加快队列进度',
+                style: TextStyle(fontSize: 12.5, color: AppColors.ink3),
+              ),
+            ],
+          ),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$value 个',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              Slider(
+                value: value.toDouble(),
+                min: 1,
+                max: 20,
+                divisions: 19,
+                label: '$value',
+                activeColor: AppColors.primary,
+                inactiveColor: AppColors.line,
+                onChanged: (v) => setState(() => value = v.toInt()),
+              ),
+            ],
+          ),
+          actions: [
+            AppDialogButton(
+              label: '取消',
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            AppDialogButton(
+              label: '保存',
+              primary: true,
+              onPressed: () {
+                UploadManager.instance.setMaxConcurrent(value);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 订阅主题：深浅色切换时重建页面与任务行图标配色
@@ -55,6 +122,11 @@ class _DownloadState extends State<Download>
                 IconTile(
                   icon: Icons.refresh,
                   onTap: _refresh,
+                ),
+                // 并行上传数量设置（像网页版一样可自定义并发）
+                IconTile(
+                  icon: Icons.speed_outlined,
+                  onTap: _showConcurrencySheet,
                 ),
               ],
             ),
@@ -302,6 +374,19 @@ class _DownloadRow extends StatelessWidget {
   }
 }
 
+/// 上传字节速率格式化（B/s、KB/s、MB/s、GB/s）
+String _formatSpeed(double bytesPerSec) {
+  if (bytesPerSec <= 0) return '--/s';
+  if (bytesPerSec < 1024) return '${bytesPerSec.toStringAsFixed(0)} B/s';
+  if (bytesPerSec < 1024 * 1024) {
+    return '${(bytesPerSec / 1024).toStringAsFixed(1)} KB/s';
+  }
+  if (bytesPerSec < 1024 * 1024 * 1024) {
+    return '${(bytesPerSec / 1024 / 1024).toStringAsFixed(1)} MB/s';
+  }
+  return '${(bytesPerSec / 1024 / 1024 / 1024).toStringAsFixed(1)} GB/s';
+}
+
 /// 上传任务行
 class _UploadRow extends StatelessWidget {
   final UploadTaskModel task;
@@ -333,7 +418,7 @@ class _UploadRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 9),
-                if (uploading)
+                if (uploading) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
                     child: LinearProgressIndicator(
@@ -342,8 +427,30 @@ class _UploadRow extends StatelessWidget {
                       color: AppColors.primary,
                       backgroundColor: AppColors.line,
                     ),
-                  )
-                else
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Text(
+                        _formatSpeed(task.speed),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.ink3,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${formatBytes(task.uploaded)} / ${formatBytes(task.size)}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.ink3,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else
                   Text(
                     ok
                         ? '上传完成'
@@ -448,24 +555,14 @@ class _ClearButton extends StatelessWidget {
     return InkWell(
       // 弹确认框：批量清空不可撤销，先让用户确认，也避免误触
       onTap: () async {
-        final ok = await showDialog<bool>(
+        final ok = await showAppConfirm(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('清空记录'),
-            content: const Text('确定清空所有已完成（含失败/取消）的记录吗？进行中的任务不会被清除。'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('取消')),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                child: const Text('清空'),
-              ),
-            ],
-          ),
+          title: '清空记录',
+          content: '确定清空所有已完成（含失败/取消）的记录吗？进行中的任务不会被清除。',
+          confirmText: '清空',
+          danger: true,
         );
-        if (ok == true) onTap();
+        if (ok) onTap();
       },
       borderRadius: BorderRadius.circular(8),
       child: Padding(

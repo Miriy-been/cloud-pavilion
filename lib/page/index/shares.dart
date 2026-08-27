@@ -79,24 +79,13 @@ class _SharesPageState extends State<SharesPage> {
   }
 
   Future<void> _deleteShare(Map<String, dynamic> share) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除分享'),
-        content: Text('确定删除「${share['name']}」的分享链接吗？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: '删除分享',
+      content: '确定删除「${share['name']}」的分享链接吗？',
+      danger: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await ShareApi.deleteShare(share['id']);
     _load(showLoading: false);
     if (!mounted) return;
@@ -136,8 +125,15 @@ class _SharesPageState extends State<SharesPage> {
             TextEditingController(text: autoExpire ? '$remainNow' : '');
         final isPrivate = currentPassword != null && currentPassword.isNotEmpty;
         return StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
-            title: const Text('编辑分享'),
+          builder: (ctx, setState) => AppDialogCard(
+            header: Text(
+              '编辑分享',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+              ),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,19 +211,22 @@ class _SharesPageState extends State<SharesPage> {
               ],
             ),
             actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('取消')),
-              TextButton(
+              AppDialogButton(
+                label: '取消',
+                onPressed: () => Navigator.pop(ctx),
+              ),
+              AppDialogButton(
+                label: '保存',
+                primary: true,
                 onPressed: () => Navigator.pop(
-                    ctx,
-                    (
-                      expireSeconds,
-                      autoExpire
-                          ? int.tryParse(remainController.text.trim())
-                          : null,
-                    )),
-                child: const Text('保存'),
+                  ctx,
+                  (
+                    expireSeconds,
+                    autoExpire
+                        ? int.tryParse(remainController.text.trim())
+                        : null,
+                  ),
+                ),
               ),
             ],
           ),

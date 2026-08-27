@@ -8,6 +8,12 @@ class UploadTaskModel {
   final String sourcePath; // 本地源文件路径
   final int size;
   double progress = 0;
+
+  /// 已上传字节数（实时进度展示用）
+  int uploaded = 0;
+
+  /// 当前上传速度（字节/秒，实时进度展示用）
+  double speed = 0;
   UploadStatus status = UploadStatus.uploading;
   String? error;
 
@@ -25,6 +31,7 @@ class UploadTaskModel {
         'sourcePath': sourcePath,
         'size': size,
         'progress': progress,
+        'uploaded': uploaded,
         'status': status.name,
         'error': error,
       };
@@ -37,6 +44,7 @@ class UploadTaskModel {
         sourcePath: json['sourcePath'] as String? ?? '',
         size: json['size'] as int? ?? 0,
       )..progress = (json['progress'] as num?)?.toDouble() ?? 0
+        ..uploaded = (json['uploaded'] as num?)?.toInt() ?? 0
         ..status = UploadStatus.values.asNameMap()[json['status'] as String?] ??
             UploadStatus.failed
         ..error = json['error'] as String?;

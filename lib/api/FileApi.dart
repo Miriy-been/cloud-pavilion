@@ -299,6 +299,15 @@ class FileApi {
     return data;
   }
 
+  /// 取消 / 删除上传会话，释放被占用的目标名称。
+  /// 上传被取消或失败后应先调用本方法释放会话，否则该 URI 一直被占用，
+  /// 重试 / 再次上传同名文件会提示「同名对象已存在」
+  static Future<void> deleteUploadSession(String sessionId, String uri) async {
+    await DioUtil().request('/api/v4/file/upload',
+        method: DioMethod.delete,
+        data: {'id': sessionId, 'uri': uri});
+  }
+
   /// 上传分片（octet-stream，dio 自动设置 Content-Length）
   static Future<void> uploadChunk(
     String sessionId,
