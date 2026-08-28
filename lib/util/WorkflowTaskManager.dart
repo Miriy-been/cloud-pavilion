@@ -120,7 +120,9 @@ class WorkflowTaskManager extends ChangeNotifier {
       _finish(id, ok: true);
     } else if (status == 'error' ||
         status == 'failed' ||
-        status == 'cancelled') {
+        status == 'cancelled' ||
+        status == 'canceled') {
+      // canceled（离线下载）与 cancelled（部分类型）都视为失败/取消而收尾
       _finish(id, ok: false);
     } else if (task == null) {
       // 找不到任务：可能已被服务器清理，连续多次后放弃并提示

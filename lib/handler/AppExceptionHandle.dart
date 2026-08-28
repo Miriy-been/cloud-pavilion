@@ -11,7 +11,11 @@ import '../util/SpUtils.dart';
 
 //全局异常的捕捉
 class AppExceptionHandle {
-  run(Widget app) {
+  /// [buildApp]：异步构建 App 的启动函数（含各插件/本地状态初始化），最终返回要 runApp 的根 Widget。
+  /// 必须在与 [WidgetsFlutterBinding.ensureInitialized] 相同的 zone 内调用 runApp，
+  /// 否则会触发 `Zone mismatch` 断言（debug 每次启动打印错误，release 下被兜底成
+  /// 「系统错误」toast）。因此这里在 runZonedGuarded 的 zone 内先 ensureInitialized 再 runApp。
+  run(FutureOr<Widget> Function() buildApp) {
     ///Flutter 框架异常
     FlutterError.onError = (FlutterErrorDetails details) async {
       ///线上环境
@@ -23,8 +27,9 @@ class AppExceptionHandle {
       }
     };
 
-    runZonedGuarded(() {
-      //受保护的代码块
+    runZonedGuarded(() async {
+      WidgetsFlutterBinding.ensureInitialized();
+      final app = await buildApp();
       runApp(app);
     }, (error, stack) => {catchError(error, stack)});
   }

@@ -49,6 +49,17 @@ class DioUtil {
   /// X-Cloudreve-Token（与浏览器一致）。首次 403 自动降级后记录，避免每次重试。
   static final Set<String> _modelScopeSites = {};
 
+  /// 持久化已确认的 ModelScope 网关站点：冷启动时恢复，避免每次进 App 的首个
+  /// 请求仍携带 Authorization 被网关 403（每次启动来回一次 403 很吵）。
+  static const String _scopeSitesKey = 'modelScopeSites';
+
+  /// 启动时调用，把本地记录的 ModelScope 网关站点恢复到内存，让首个请求直接
+  /// 跳过 Authorization 头（零 403）。
+  static Future<void> bootModelScopeSites() async {
+    final saved = await SpUtils.getStringList(_scopeSitesKey);
+    if (saved.isNotEmpty) _modelScopeSites.addAll(saved);
+  }
+
   /// 初始化
   DioUtil._internal() {
     _instance = this;
@@ -119,15 +130,21 @@ class DioUtil {
 
   /// 错误处理：HTTP 401 或业务码 401 时自动刷新 token 并重放请求
   void _onError(DioException error, ErrorInterceptorHandler handler) {
-    // 联调日志：打印失败请求的完整信息
-    debugPrint('Dio错误: ${error.requestOptions.method} '
-        '${error.requestOptions.uri} '
-        '-> ${error.response?.statusCode} ${error.response?.data}');
     final resp = error.response;
     final isAuthExpired = resp?.statusCode == 401 ||
         (resp?.data is Map && resp?.data['code'] == 401);
     final isTokenEndpoint =
         error.requestOptions.path.contains('/session/token');
+    // ModelScope 网关 403（可自动降级恢复的预期路径）：不打印误导性的错误日志
+    final isGate403 = resp?.data is Map &&
+        resp?.data['Code'] == 10010101007 &&
+        error.requestOptions.extra['_skipAuthRetry'] != true;
+    // 联调日志：打印失败请求的完整信息
+    if (!isGate403) {
+      debugPrint('Dio错误: ${error.requestOptions.method} '
+          '${error.requestOptions.uri} '
+          '-> ${error.response?.statusCode} ${error.response?.data}');
+    }
     if (isAuthExpired && !isTokenEndpoint) {
       _retryWithRefresh(error, handler);
       return;
@@ -135,11 +152,10 @@ class DioUtil {
     // ModelScope 网关 403：Authorization 头被拦截（当成 SDK Token 校验）。
     // 去掉 Authorization 头重试（只发 X-Cloudreve-Token），并把该站点记入
     // _modelScopeSites，后续请求直接不发 Authorization，避免每次先 403 再重试。
-    if (resp?.data is Map &&
-        resp?.data['Code'] == 10010101007 &&
-        error.requestOptions.extra['_skipAuthRetry'] != true) {
+    if (isGate403) {
       final opts = error.requestOptions;
       _modelScopeSites.add(opts.baseUrl);
+      SpUtils.setStringList(_scopeSitesKey, _modelScopeSites.toList());
       opts.headers.remove(authHeaderName);
       opts.extra['_skipAuthRetry'] = true;
       _dio.fetch(opts).then(

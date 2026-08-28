@@ -142,14 +142,6 @@ class _OfflineDownloadPageState extends State<OfflineDownloadPage> {
           Expanded(child: _buildBody()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _create,
-        backgroundColor: AppColors.primarySoft,
-        foregroundColor: AppColors.primary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: const Icon(Icons.add, size: 26),
-      ),
     );
   }
 
@@ -172,7 +164,7 @@ class _OfflineDownloadPageState extends State<OfflineDownloadPage> {
                     EmptyState(
                       icon: Icons.download_for_offline_outlined,
                       title: '暂无离线下载任务',
-                      subtitle: '点击右下角按钮，粘贴链接即可下载到云盘',
+                      subtitle: '点击右上角「新建」按钮，粘贴链接即可下载到云盘',
                     ),
                   ],
                 )
@@ -470,13 +462,21 @@ class _CreateRemoteDownloadDialogState
     try {
       final tasks = await WorkflowApi.createRemoteDownload(urls, _dst);
       if (!mounted) return;
+      // 与压缩任务对齐：创建成功用 SnackBar 提示（先取 messenger，避免弹窗关闭后 context 失效）
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context, true);
-      // 跟踪任务：完成 / 失败时全局 toast 通知
+      messenger.showSnackBar(appSnack(urls.length > 1
+          ? '已添加 ${urls.length} 个离线下载任务，后台处理中，完成后将通知你'
+          : '已创建离线下载任务，后台处理中，完成后将通知你'));
+      // 跟踪任务：完成 / 失败时全局 toast 通知（带任务名，便于区分）
       for (final t in tasks) {
         final m = t is Map ? t : const <String, dynamic>{};
         final id = m['id']?.toString() ?? '';
         if (id.isNotEmpty) {
-          WorkflowTaskManager.instance.track(id, '离线下载');
+          final name = RemoteDownloadTaskModel.fromJson(
+            Map<String, dynamic>.from(m),
+          ).displayName;
+          WorkflowTaskManager.instance.track(id, '离线下载「$name」');
         }
       }
       // 新文件出现在目标目录，失效列表缓存

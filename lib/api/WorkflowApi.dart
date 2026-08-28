@@ -16,10 +16,14 @@ class WorkflowApi {
   }
 
   /// 按 ID 查找后台任务（用于轮询任务状态，找不到返回 null）
+  /// 压缩/解压等普通任务在 `general` 分类；离线下载（download 类型）任务在
+  /// `downloading` / `downloaded` 分类，因此需要遍历这三个分类才能命中。
   static Future<Map<String, dynamic>?> findTaskById(String id) async {
-    final tasks = await listTasks(category: 'general', pageSize: 100);
-    for (final t in tasks) {
-      if (t is Map<String, dynamic> && t['id'] == id) return t;
+    for (final category in const ['general', 'downloading', 'downloaded']) {
+      final tasks = await listTasks(category: category, pageSize: 100);
+      for (final t in tasks) {
+        if (t is Map<String, dynamic> && t['id']?.toString() == id) return t;
+      }
     }
     return null;
   }
