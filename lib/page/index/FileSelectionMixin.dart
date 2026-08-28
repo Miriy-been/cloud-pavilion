@@ -191,9 +191,16 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
   Future<void> batchDownload(List<FileItemModel> items) async {
     final files = items.where((e) => !e.isDir).toList();
     final dirs = items.where((e) => e.isDir).toList();
+    // 单个文件取直链失败不中断：记录失败数，继续处理其余文件，最后统一提示，
+    // 避免断网/DNS 失败时抛未处理异常（Unhandled Exception）
+    var failed = 0;
     for (final obj in files) {
-      final url = await FileApi.getDownloadUrl(obj.path);
-      DownloadManager.instance.startDownload(obj.name, url);
+      try {
+        final url = await FileApi.getDownloadUrl(obj.path);
+        DownloadManager.instance.startDownload(obj.name, url);
+      } catch (e) {
+        failed++;
+      }
     }
     for (final obj in dirs) {
       final downloader = onFolderDownload;
@@ -203,12 +210,17 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
             .showSnackBar(appSnack('暂不支持下载文件夹'));
         return;
       }
-      await downloader(obj);
+      try {
+        await downloader(obj);
+      } catch (e) {
+        failed++;
+      }
     }
     exitSelection();
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(appSnack('已添加 ${files.length} 个下载任务'));
+    ScaffoldMessenger.of(context).showSnackBar(appSnack(failed > 0
+        ? '已添加 ${files.length - failed} 个下载任务，$failed 个失败'
+        : '已添加 ${files.length} 个下载任务'));
   }
 
   /// 批量删除（进回收站）
@@ -237,6 +249,12 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
       }
       exitSelection();
       afterAction();
+      return;
+    } catch (e) {
+      // 网络错误 / 服务端业务失败：明确提示，避免「静默成功」（提示已删除但实际未删）
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(appSnack('删除失败：${errorText(e, '未知错误')}'));
       return;
     }
     exitSelection();
@@ -292,9 +310,17 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
       ScaffoldMessenger.of(context).showSnackBar(appSnack(error));
       return;
     }
-    await FileApi.moveOrCopyFiles(
-        items.map((e) => e.path).toList(), result.uri,
-        copy: result.copy);
+    try {
+      await FileApi.moveOrCopyFiles(
+          items.map((e) => e.path).toList(), result.uri,
+          copy: result.copy);
+    } catch (e) {
+      // 网络 / 业务失败：明确提示，避免「已移动/复制」但实际未执行
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(appSnack('${result.copy ? '复制' : '移动'}失败：${errorText(e, '未知错误')}'));
+      return;
+    }
     exitSelection();
     afterAction();
     if (!mounted) return;
@@ -313,7 +339,15 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
     final obj = items.first;
     final name = await showInputDialog('重命名', '新名称', initial: obj.name);
     if (name == null || name.isEmpty || name == obj.name) return;
-    await FileApi.renameFile(obj.path, name);
+    try {
+      await FileApi.renameFile(obj.path, name);
+    } catch (e) {
+      // 网络 / 业务失败：明确提示，避免「已重命名」但实际未执行
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(appSnack('重命名失败：${errorText(e, '未知错误')}'));
+      return;
+    }
     exitSelection();
     afterAction();
   }

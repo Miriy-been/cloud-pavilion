@@ -15,6 +15,7 @@ import 'package:cloudpavilion/page/index/search.dart';
 import 'package:cloudpavilion/page/preview/AudioPlayerPage.dart';
 import 'package:cloudpavilion/page/preview/PreviewPage.dart';
 import 'package:cloudpavilion/page/tools/FolderPicker.dart';
+import 'package:cloudpavilion/page/tools/OfflineDownloadPage.dart';
 import '../../util/AudioPlayerService.dart';
 import '../../util/DownloadManager.dart';
 import '../../util/ErrorText.dart';
@@ -23,6 +24,9 @@ import '../../util/UploadManager.dart';
 import '../../util/WorkflowTaskManager.dart';
 
 /// 存储主页（列表 / 网格 / 多选）
+/// 存储页视图：列表 / 网格 / 画廊（画廊为纯缩略图墙，全局共用）
+enum _View { list, grid, gallery }
+
 class Index extends StatefulWidget {
   /// 多选状态变化回调（用于隐藏底部主导航栏）
   final ValueChanged<bool>? onSelectionChanged;
@@ -38,10 +42,30 @@ class _IndexState extends State<Index>
   late List<FileItemModel> currentList = [];
   // 视图与排序
   bool _isGridView = false;
+  // 画廊模式（纯缩略图墙，全局共用）
+  bool _isGallery = false;
   String _orderBy = '';
   String _orderDirection = '';
   // 文件夹导航栈（用于面包屑与返回上级）
   final List<FileItemModel> _folderStack = [];
+
+  /// 当前生效的视图
+  _View get _currentView {
+    if (_isGallery) return _View.gallery;
+    return _isGridView ? _View.grid : _View.list;
+  }
+
+  /// 视图切换图标：显示「下一档」的图标（列表→网格→画廊→列表）
+  IconData get _viewIcon {
+    switch (_currentView) {
+      case _View.list:
+        return Icons.grid_view_outlined;
+      case _View.grid:
+        return Icons.photo_library_outlined;
+      case _View.gallery:
+        return Icons.view_list_outlined;
+    }
+  }
 
   @override
   ValueChanged<bool>? get onSelectionChanged => widget.onSelectionChanged;
@@ -64,12 +88,17 @@ class _IndexState extends State<Index>
     WorkflowTaskManager.instance.addListener(_onWorkflowTaskChanged);
   }
 
-  /// 恢复全局视图模式
+  /// 恢复全局视图模式（列表 / 网格 / 画廊）
   Future<void> _loadGridView() async {
-    final grid = await SpUtils.getBool('gridView');
-    if (mounted && grid != _isGridView) {
-      setState(() => _isGridView = grid);
-    }
+    final values = await Future.wait([
+      SpUtils.getBool('gridView'),
+      SpUtils.getBool('galleryView'),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      if (values[0] != _isGridView) _isGridView = values[0];
+      if (values[1] != _isGallery) _isGallery = values[1];
+    });
   }
 
   @override
@@ -159,6 +188,24 @@ class _IndexState extends State<Index>
                         subtitle: '上传你的第一个文件，开启云端之旅',
                         actionLabel: '上传文件',
                         onAction: onUpload,
+                      ),
+                    )
+                  else if (_currentView == _View.gallery)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(4, 6, 4, 16),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 4,
+                          crossAxisSpacing: 4,
+                          childAspectRatio: 1,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) =>
+                              _buildGalleryItem(currentList[index]),
+                          childCount: currentList.length,
+                        ),
                       ),
                     )
                   else if (_isGridView)
@@ -293,13 +340,11 @@ class _IndexState extends State<Index>
                   ),
                 ),
               ),
-              // 视图切换：当前为网格时显示列表图标，反之显示网格图标
+              // 视图切换：三态循环（列表→网格→画廊）
               _headerAction(
                 IconTile(
-                  icon: _isGridView
-                      ? Icons.view_list_outlined
-                      : Icons.grid_view_outlined,
-                  onTap: () => _setGridView(!_isGridView),
+                  icon: _viewIcon,
+                  onTap: _cycleView,
                 ),
               ),
               // 回收站入口（原三点菜单功能已分散到排序胶囊 / 悬浮按钮）
@@ -381,6 +426,16 @@ class _IndexState extends State<Index>
                 onTap: () {
                   Navigator.pop(ctx);
                   onCreateFile();
+                },
+              ),
+              _QuickAction(
+                icon: Icons.cloud_download_outlined,
+                color: FileType.DOC.fg,
+                bg: FileType.DOC.bg,
+                label: '离线下载',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _offlineDownload();
                 },
               ),
             ],
@@ -587,6 +642,27 @@ class _IndexState extends State<Index>
     SpUtils.setBool('gridView', grid);
   }
 
+  /// 三态循环视图：列表→网格→画廊→列表
+  void _cycleView() {
+    switch (_currentView) {
+      case _View.gallery:
+        // 画廊 → 列表
+        setState(() {
+          _isGallery = false;
+          _isGridView = false;
+        });
+        SpUtils.setBool('galleryView', false);
+        SpUtils.setBool('gridView', false);
+      case _View.grid:
+        // 网格 → 画廊
+        setState(() => _isGallery = true);
+        SpUtils.setBool('galleryView', true);
+      case _View.list:
+        // 列表 → 网格
+        _setGridView(true);
+    }
+  }
+
   /// 列表视图项
   Widget _buildListItem(BuildContext context, int index) {
     final obj = currentList[index];
@@ -683,6 +759,74 @@ class _IndexState extends State<Index>
           ),
         ),
       ),
+    );
+  }
+
+  /// 画廊项：方形大缩略图近全屏铺满、无文字；视频叠加小播放角标；支持多选
+  Widget _buildGalleryItem(FileItemModel obj) {
+    final isSelected = selectionMode && selected.contains(obj);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tile = constraints.maxWidth;
+        return GestureDetector(
+          onLongPressStart: (details) {
+            if (!selectionMode) {
+              setSelectionMode(true);
+            }
+            toggleSelect(obj);
+          },
+          onTap: () {
+            if (selectionMode) {
+              toggleSelect(obj);
+            } else {
+              _openFile(obj);
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(
+                color: AppColors.surface,
+                child: GridThumb(
+                    key: ValueKey(obj.path),
+                    file: obj,
+                    size: tile,
+                    borderRadius: 0),
+              ),
+              // 视频小播放角标
+              if (FileType.isVideo(obj.type, obj.name))
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow,
+                        size: 14, color: Colors.white),
+                  ),
+                ),
+              // 多选勾选与选中高亮
+              if (selectionMode)
+                Positioned(
+                  left: 6,
+                  top: 6,
+                  child: RoundCheck(on: isSelected),
+                ),
+              if (isSelected)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.22),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -966,7 +1110,15 @@ class _IndexState extends State<Index>
     if (name == null || name.isEmpty) return;
     final menu = await SpUtils.getString('currentMenu');
     if (menu.isEmpty) return;
-    await FileApi.createFolder(menu, name);
+    try {
+      await FileApi.createFolder(menu, name);
+    } catch (e) {
+      // 网络 / 业务失败：明确提示，避免「已创建」但实际未创建
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(appSnack('新建文件夹失败：${errorText(e, '未知错误')}'));
+      return;
+    }
     _refresh();
   }
 
@@ -1015,6 +1167,18 @@ class _IndexState extends State<Index>
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(appSnack('已创建「$name」'));
+  }
+
+  /// 离线下载：服务器后台下载链接到当前目录
+  Future<void> _offlineDownload() async {
+    final dir = await SpUtils.getString('currentMenu');
+    if (dir.isEmpty) return;
+    final created = await showCreateRemoteDownloadDialog(
+      context,
+      startUri: dir,
+    );
+    // 创建成功后刷新列表（新文件会出现在当前目录）
+    if (created && mounted) _refresh();
   }
 
   /// 保持页面状态

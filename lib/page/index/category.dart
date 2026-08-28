@@ -69,6 +69,12 @@ class _CategoryPageState extends State<CategoryPage>
     SpUtils.setBool('categoryView', _isGridView);
   }
 
+  /// 下拉刷新：分类页本身是静态入口卡片，下拉即失效文件列表缓存，
+  /// 让下次进入分类文件页时拉取最新数据
+  Future<void> _refreshCategories() async {
+    FileApi.invalidateListCache();
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -95,14 +101,18 @@ class _CategoryPageState extends State<CategoryPage>
             ),
           ),
           Expanded(
-            child: _isGridView
-                ? _buildGrid()
-                : ListView.builder(
-                    padding: EdgeInsets.fromLTRB(pagePad, 6, pagePad, 16),
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) =>
-                        _buildCard(_items[index], listMode: true),
-                  ),
+            child: RefreshIndicator(
+              onRefresh: _refreshCategories,
+              child: _isGridView
+                  ? _buildGrid()
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(pagePad, 6, pagePad, 16),
+                      itemCount: _items.length,
+                      itemBuilder: (context, index) =>
+                          _buildCard(_items[index], listMode: true),
+                    ),
+            ),
           ),
         ],
       ),
@@ -112,6 +122,7 @@ class _CategoryPageState extends State<CategoryPage>
   /// 双列卡片网格
   Widget _buildGrid() {
     return GridView.count(
+      physics: const AlwaysScrollableScrollPhysics(),
       crossAxisCount: 2,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
@@ -221,15 +232,38 @@ class CategoryFilesPage extends StatefulWidget {
   State<CategoryFilesPage> createState() => _CategoryFilesPageState();
 }
 
+/// 分类文件页视图：列表 / 网格 / 画廊（画廊仅图片、视频分类可用）
+enum _CatView { list, grid, gallery }
+
 class _CategoryFilesPageState extends State<CategoryFilesPage>
     with FileSelectionMixin<CategoryFilesPage> {
   List<FileItemModel> _items = [];
   bool _loading = true;
   // 与存储页共用的全局文件视图模式（列表 / 网格）
   bool _isGridView = false;
+  // 画廊模式（仅图片 / 视频分类生效，分类页独立持久化）
+  bool _isGallery = false;
   // 排序
   String _orderBy = '';
   String _orderDirection = '';
+
+  /// 当前生效的视图
+  _CatView get _currentView {
+    if (_isGallery) return _CatView.gallery;
+    return _isGridView ? _CatView.grid : _CatView.list;
+  }
+
+  /// 视图切换图标：显示「下一档」的图标（列表→网格→画廊→列表）
+  IconData get _viewIcon {
+    switch (_currentView) {
+      case _CatView.list:
+        return Icons.grid_view_outlined;
+      case _CatView.grid:
+        return Icons.photo_library_outlined;
+      case _CatView.gallery:
+        return Icons.view_list_outlined;
+    }
+  }
 
   /// 批量操作完成后的列表刷新
   @override
@@ -242,18 +276,44 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
     _load();
   }
 
-  /// 恢复全局文件视图模式
+  /// 恢复全局文件视图模式 + 分类画廊模式
   Future<void> _loadView() async {
-    final grid = await SpUtils.getBool('gridView');
-    if (mounted && grid != _isGridView) {
-      setState(() => _isGridView = grid);
-    }
+    final values = await Future.wait([
+      SpUtils.getBool('gridView'),
+      SpUtils.getBool('categoryGallery'),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      if (values[0] != _isGridView) _isGridView = values[0];
+      if (values[1] != _isGallery) _isGallery = values[1];
+    });
   }
 
   /// 切换视图模式（全局生效并持久化，与存储页一致）
   void _setGridView(bool grid) {
     setState(() => _isGridView = grid);
     SpUtils.setBool('gridView', grid);
+  }
+
+  /// 三态循环视图：列表→网格→画廊→列表
+  void _cycleView() {
+    switch (_currentView) {
+      case _CatView.gallery:
+        // 画廊 → 列表
+        setState(() {
+          _isGallery = false;
+          _isGridView = false;
+        });
+        SpUtils.setBool('galleryView', false);
+        SpUtils.setBool('gridView', false);
+      case _CatView.grid:
+        // 网格 → 画廊
+        setState(() => _isGallery = true);
+        SpUtils.setBool('galleryView', true);
+      case _CatView.list:
+        // 列表 → 网格
+        _setGridView(true);
+    }
   }
 
   /// 设置排序字段并重新加载
@@ -363,12 +423,10 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
                         onTap: () => Navigator.pop(context),
                       ),
                       actions: [
-                        // 视图切换：当前为网格时显示列表图标，反之显示网格图标（与存储页一致）
+                        // 视图切换：图片 / 视频分类三态循环（列表→网格→画廊），其余分类列表 / 网格切换
                         IconTile(
-                          icon: _isGridView
-                              ? Icons.view_list_outlined
-                              : Icons.grid_view_outlined,
-                          onTap: () => _setGridView(!_isGridView),
+                          icon: _viewIcon,
+                          onTap: _cycleView,
                         ),
                       ],
                     ),
@@ -418,7 +476,28 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
                                 ),
                               ),
                             ),
-                            if (_isGridView)
+                            if (_currentView == _CatView.gallery)
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(
+                                    4, 6, 4, MediaQuery.of(context).padding.bottom + 16),
+                                sliver: SliverGrid(
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    mainAxisSpacing: 4,
+                                    crossAxisSpacing: 4,
+                                    childAspectRatio: 1,
+                                  ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                      final obj = _items[index];
+                                      return _buildGalleryItem(obj);
+                                    },
+                                    childCount: _items.length,
+                                  ),
+                                ),
+                              )
+                            else if (_isGridView)
                               SliverPadding(
                                 padding: EdgeInsets.fromLTRB(
                                     pagePad, 6, pagePad, 16),
@@ -563,6 +642,74 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
           ),
         ),
       ),
+    );
+  }
+
+  /// 画廊项：方形大缩略图近全屏铺满、无文字；视频叠加小播放角标；支持多选
+  Widget _buildGalleryItem(FileItemModel obj) {
+    final isSelected = selectionMode && selected.contains(obj);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tile = constraints.maxWidth;
+        return GestureDetector(
+          onLongPressStart: (details) {
+            if (!selectionMode) {
+              setSelectionMode(true);
+            }
+            toggleSelect(obj);
+          },
+          onTap: () {
+            if (selectionMode) {
+              toggleSelect(obj);
+            } else {
+              _open(obj);
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(
+                color: AppColors.surface,
+                child: GridThumb(
+                    key: ValueKey(obj.path),
+                    file: obj,
+                    size: tile,
+                    borderRadius: 0),
+              ),
+              // 视频小播放角标
+              if (FileType.isVideo(obj.type, obj.name))
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow,
+                        size: 14, color: Colors.white),
+                  ),
+                ),
+              // 多选勾选与选中高亮
+              if (selectionMode)
+                Positioned(
+                  left: 6,
+                  top: 6,
+                  child: RoundCheck(on: isSelected),
+                ),
+              if (isSelected)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.22),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

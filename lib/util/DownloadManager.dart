@@ -242,6 +242,10 @@ class DownloadManager extends ChangeNotifier {
     task.status = DownloadStatus.downloading;
     task.error = null;
     task.progress = 0;
+    // 重置进度状态，避免重试时残留上次的已下载字节 / 速度显示
+    task.downloaded = 0;
+    task.totalSize = 0;
+    task.speed = 0;
     _notifyImmediate();
     await _runDownload(task, systemDownloads: task.systemDownloads);
   }

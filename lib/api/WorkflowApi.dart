@@ -40,4 +40,38 @@ class WorkflowApi {
         data: {'src': [srcUri], 'dst': dstUri});
     return result['data'];
   }
+
+  /// 创建离线下载任务（服务器后台下载多个链接到目标目录）
+  /// [srcUrls] 下载链接列表；[dstUri] 目标文件夹 URI（如 cloudreve://my/...）
+  /// 返回创建的任务对象列表（data 为数组）
+  static Future<List<dynamic>> createRemoteDownload(
+      List<String> srcUrls, String dstUri) async {
+    var result = await DioUtil().request('/api/v4/workflow/download',
+        method: DioMethod.post, data: {'src': srcUrls, 'dst': dstUri});
+    final data = result['data'];
+    return data is List ? data : (data == null ? [] : [data]);
+  }
+
+  /// 列出离线下载任务
+  /// [category]: downloading（进行中）/ downloaded（已完成/失败/已取消）
+  /// 返回任务对象列表（TaskResponse）
+  static Future<List<Map<String, dynamic>>> listRemoteDownloads(
+      {required String category, int pageSize = 50}) async {
+    var result = await DioUtil().request('/api/v4/workflow',
+        method: DioMethod.get,
+        params: {'category': category, 'page_size': pageSize});
+    final data = result['data'];
+    final tasks = data['tasks'];
+    if (tasks is! List) return [];
+    return tasks
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  /// 取消离线下载任务
+  static Future<void> cancelRemoteDownload(String id) async {
+    await DioUtil().request('/api/v4/workflow/download/$id',
+        method: DioMethod.delete);
+  }
 }

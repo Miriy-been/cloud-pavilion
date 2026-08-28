@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloudpavilion/exception/BusinessException.dart';
 import 'package:cloudpavilion/exception/NotLoginException.dart';
 import 'package:cloudpavilion/util/AuthState.dart';
 import './SpUtils.dart';
@@ -269,6 +270,9 @@ class DioUtil {
   }
 
   /// 请求类
+  /// [checkCode] 为 true 时统一校验业务码：非 0（除 401，已在拦截器处理）视为业务失败
+  /// 抛 [BusinessException]，杜绝各 API 方法漏判导致的「静默成功」。
+  /// 需读取原始 code/msg 的接口（如登录）传 `checkCode: false` 豁免。
   Future<T> request<T>(
     String path, {
     DioMethod method = DioMethod.get,
@@ -278,6 +282,7 @@ class DioUtil {
     Options? options,
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
+    bool checkCode = true,
   }) async {
     const _methodValues = {
       DioMethod.get: 'get',
@@ -299,7 +304,11 @@ class DioUtil {
           options: options,
           onSendProgress: onSendProgress,
           onReceiveProgress: onReceiveProgress);
-      return response.data;
+      final body = response.data;
+      // 统一业务码校验逻辑集中在 BusinessException.fromBody（可单测）
+      final biz = BusinessException.fromBody(body, checkCode: checkCode);
+      if (biz != null) throw biz;
+      return body;
     } on DioException catch (e) {
       rethrow;
     }

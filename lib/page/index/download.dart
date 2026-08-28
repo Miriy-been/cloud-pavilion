@@ -3,6 +3,7 @@ import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/model/DownloadTaskModel.dart';
 import 'package:cloudpavilion/model/UploadTaskModel.dart';
+import 'package:cloudpavilion/page/tools/OfflineDownloadPage.dart';
 import 'package:cloudpavilion/util/DownloadManager.dart';
 import 'package:cloudpavilion/util/UploadManager.dart';
 
@@ -30,9 +31,9 @@ class _DownloadState extends State<Download>
     super.dispose();
   }
 
-  /// 手动刷新：重新触发下载 / 上传列表重建，
-  /// 用于主题切换后 UI 残留旧配色等需要即时重绘的场景
-  void _refresh() {
+  /// 下拉刷新：重新触发下载 / 上传列表重建
+  /// （本地任务实时更新，无需网络请求，仅重绘 UI）
+  Future<void> _refresh() async {
     DownloadManager.instance.notifyListeners();
     UploadManager.instance.notifyListeners();
   }
@@ -118,15 +119,19 @@ class _DownloadState extends State<Download>
               title: '传输',
               subtitle: '下载与上传任务一览',
               actions: [
-                // 手动刷新：重新触发传输列表重建（如主题切换后 UI 残留旧配色）
-                IconTile(
-                  icon: Icons.refresh,
-                  onTap: _refresh,
-                ),
                 // 并行上传数量设置（像网页版一样可自定义并发）
                 IconTile(
                   icon: Icons.speed_outlined,
                   onTap: _showConcurrencySheet,
+                ),
+                // 离线下载：服务器后台下载链接到云盘（任务列表页）
+                IconTile(
+                  icon: Icons.cloud_download_outlined,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const OfflineDownloadPage()),
+                  ),
                 ),
               ],
             ),
@@ -159,7 +164,10 @@ class _DownloadState extends State<Download>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [_DownloadTab(), _UploadTab()],
+              children: [
+                _DownloadTab(onRefresh: _refresh),
+                _UploadTab(onRefresh: _refresh),
+              ],
             ),
           ),
         ],
@@ -170,7 +178,9 @@ class _DownloadState extends State<Download>
 
 /// 下载任务 Tab：仅监听下载任务变化，独立刷新
 class _DownloadTab extends StatefulWidget {
-  const _DownloadTab();
+  final Future<void> Function() onRefresh;
+
+  const _DownloadTab({required this.onRefresh});
 
   @override
   State<_DownloadTab> createState() => _DownloadTabState();
@@ -193,34 +203,50 @@ class _DownloadTabState extends State<_DownloadTab>
       listenable: DownloadManager.instance,
       builder: (context, _) {
         final tasks = DownloadManager.instance.tasks;
-        if (tasks.isEmpty) {
-          return const EmptyState(
-            icon: Icons.download_for_offline_outlined,
-            title: '暂无下载任务',
-            subtitle: '从「存储」页选择文件即可开始下载',
-          );
-        }
-        final active =
-            tasks.where((t) => t.status == DownloadStatus.downloading).toList();
-        final done =
-            tasks.where((t) => t.status != DownloadStatus.downloading).toList();
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(pagePad, 14, pagePad, 16),
-          children: [
-            for (final t in active) _DownloadRow(task: t),
-            if (active.isNotEmpty && done.isNotEmpty) const SizedBox(height: 14),
-            if (done.isNotEmpty) ...[
-              SectionHeader(
-                title: '已完成',
-                count: '${done.length}',
-                trailing: _ClearButton(
-                  onTap: () => DownloadManager.instance.clearFinished(),
+        return RefreshIndicator(
+          onRefresh: widget.onRefresh,
+          child: tasks.isEmpty
+              // 空列表也可下拉刷新：用可滚动容器承载空状态
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 150),
+                    EmptyState(
+                      icon: Icons.download_for_offline_outlined,
+                      title: '暂无下载任务',
+                      subtitle: '从「存储」页选择文件即可开始下载',
+                    ),
+                  ],
+                )
+              : ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(pagePad, 14, pagePad, 16),
+                  children: [
+                    for (final t in tasks.where((t) =>
+                        t.status == DownloadStatus.downloading))
+                      _DownloadRow(task: t),
+                    if (tasks.any((t) =>
+                            t.status == DownloadStatus.downloading) &&
+                        tasks.any(
+                            (t) => t.status != DownloadStatus.downloading))
+                      const SizedBox(height: 14),
+                    if (tasks
+                        .any((t) => t.status != DownloadStatus.downloading)) ...[
+                      SectionHeader(
+                        title: '已完成',
+                        count:
+                            '${tasks.where((t) => t.status != DownloadStatus.downloading).length}',
+                        trailing: _ClearButton(
+                          onTap: () => DownloadManager.instance.clearFinished(),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      for (final t in tasks.where((t) =>
+                          t.status != DownloadStatus.downloading))
+                        _DownloadRow(task: t),
+                    ],
+                  ],
                 ),
-              ),
-              const SizedBox(height: 2),
-              for (final t in done) _DownloadRow(task: t),
-            ],
-          ],
         );
       },
     );
@@ -229,7 +255,9 @@ class _DownloadTabState extends State<_DownloadTab>
 
 /// 上传任务 Tab：仅监听上传任务变化，独立刷新
 class _UploadTab extends StatefulWidget {
-  const _UploadTab();
+  final Future<void> Function() onRefresh;
+
+  const _UploadTab({required this.onRefresh});
 
   @override
   State<_UploadTab> createState() => _UploadTabState();
@@ -251,34 +279,50 @@ class _UploadTabState extends State<_UploadTab>
       listenable: UploadManager.instance,
       builder: (context, _) {
         final tasks = UploadManager.instance.tasks;
-        if (tasks.isEmpty) {
-          return const EmptyState(
-            icon: Icons.file_upload_outlined,
-            title: '暂无上传任务',
-            subtitle: '从「存储」页点击上传即可开始',
-          );
-        }
-        final active =
-            tasks.where((t) => t.status == UploadStatus.uploading).toList();
-        final done =
-            tasks.where((t) => t.status != UploadStatus.uploading).toList();
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(pagePad, 14, pagePad, 16),
-          children: [
-            for (final t in active) _UploadRow(task: t),
-            if (active.isNotEmpty && done.isNotEmpty) const SizedBox(height: 14),
-            if (done.isNotEmpty) ...[
-              SectionHeader(
-                title: '已完成',
-                count: '${done.length}',
-                trailing: _ClearButton(
-                  onTap: () => UploadManager.instance.clearFinished(),
+        return RefreshIndicator(
+          onRefresh: widget.onRefresh,
+          child: tasks.isEmpty
+              // 空列表也可下拉刷新：用可滚动容器承载空状态
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 150),
+                    EmptyState(
+                      icon: Icons.file_upload_outlined,
+                      title: '暂无上传任务',
+                      subtitle: '从「存储」页点击上传即可开始',
+                    ),
+                  ],
+                )
+              : ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(pagePad, 14, pagePad, 16),
+                  children: [
+                    for (final t in tasks.where(
+                        (t) => t.status == UploadStatus.uploading))
+                      _UploadRow(task: t),
+                    if (tasks.any(
+                            (t) => t.status == UploadStatus.uploading) &&
+                        tasks.any(
+                            (t) => t.status != UploadStatus.uploading))
+                      const SizedBox(height: 14),
+                    if (tasks.any(
+                        (t) => t.status != UploadStatus.uploading)) ...[
+                      SectionHeader(
+                        title: '已完成',
+                        count:
+                            '${tasks.where((t) => t.status != UploadStatus.uploading).length}',
+                        trailing: _ClearButton(
+                          onTap: () => UploadManager.instance.clearFinished(),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      for (final t in tasks.where(
+                          (t) => t.status != UploadStatus.uploading))
+                        _UploadRow(task: t),
+                    ],
+                  ],
                 ),
-              ),
-              const SizedBox(height: 2),
-              for (final t in done) _UploadRow(task: t),
-            ],
-          ],
         );
       },
     );

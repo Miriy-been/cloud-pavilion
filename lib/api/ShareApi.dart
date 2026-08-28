@@ -88,13 +88,15 @@ class ShareApi {
           if (orderDirection != null && orderDirection.isNotEmpty)
             'order_direction': orderDirection,
         });
-    final data = result['data'];
-    return data['shares'] as List? ?? [];
+    // 校验业务码并防御 data 为 null，避免失败时静默显示空列表
+    final data = _checkData(result);
+    return data is Map ? (data['shares'] as List? ?? []) : [];
   }
 
-  /// 删除分享链接
+  /// 删除分享链接（校验业务码，失败时抛异常避免「静默成功」）
   static Future<void> deleteShare(String shareId) async {
-    await DioUtil().request('/api/v4/share/$shareId',
+    final result = await DioUtil().request('/api/v4/share/$shareId',
         method: DioMethod.delete);
+    _checkData(result);
   }
 }

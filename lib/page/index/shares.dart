@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloudpavilion/api/ShareApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
+import 'package:cloudpavilion/util/ErrorText.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
 
 /// 我的分享列表页
@@ -86,7 +87,15 @@ class _SharesPageState extends State<SharesPage> {
       danger: true,
     );
     if (!confirmed) return;
-    await ShareApi.deleteShare(share['id']);
+    try {
+      await ShareApi.deleteShare(share['id']);
+    } catch (e) {
+      // 网络 / 业务失败：明确提示，避免「已删除」但实际未删
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(appSnack('删除失败：${errorText(e, '未知错误')}'));
+      return;
+    }
     _load(showLoading: false);
     if (!mounted) return;
     ScaffoldMessenger.of(context)

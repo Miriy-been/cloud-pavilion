@@ -1,0 +1,110 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
+import 'package:cloudpavilion/model/DownloadTaskModel.dart';
+import 'package:cloudpavilion/model/UploadTaskModel.dart';
+import 'package:cloudpavilion/util/ErrorText.dart';
+
+/// 核心纯逻辑单元测试：任务模型序列化容错 + 失败提示中文化。
+/// 覆盖上传/下载任务持久化恢复（restore）与删除/上传/下载失败提示链路，
+/// 防止「静默成功」「恢复后状态异常」等回归。
+void main() {
+  group('ErrorText 失败提示中文化', () {
+    test('服务端 msg「Object existed」映射为「目标位置已存在同名文件」', () {
+      final opts = RequestOptions(path: '/api/v4/file/upload');
+      final e = DioException(
+        requestOptions: opts,
+        response: Response(
+          requestOptions: opts,
+          statusCode: 200,
+          data: {'code': 40005, 'msg': 'Object existed'},
+        ),
+      );
+      expect(errorText(e, '网络错误'), '目标位置已存在同名文件');
+    });
+
+    test('连接超时映射为「网络超时」', () {
+      final e = DioException(
+        type: DioExceptionType.connectionTimeout,
+        requestOptions: RequestOptions(path: '/api'),
+      );
+      expect(errorText(e, '网络错误'), '网络超时');
+    });
+
+    test('普通 Exception 去除 Exception: 前缀', () {
+      expect(errorText(Exception('上传已中断'), '未知错误'), '上传已中断');
+    });
+
+    test('空 msg 回退到兜底文案', () {
+      // Exception('') 的 toString 去前缀后为空，应回退 fallback
+      expect(errorText(Exception(''), '未知错误'), '未知错误');
+    });
+  });
+
+  group('UploadTaskModel 序列化', () {
+    test('toJson → fromJson 往返保持字段一致', () {
+      final t = UploadTaskModel(
+        name: 'a.txt',
+        uri: 'cloudreve://my/a.txt',
+        sourcePath: '/tmp/a.txt',
+        size: 1024,
+      )
+        ..progress = 0.5
+        ..uploaded = 512
+        ..speed = 100
+        ..status = UploadStatus.failed
+        ..error = '上传已中断';
+      final restored = UploadTaskModel.fromJson(t.toJson());
+      expect(restored.name, 'a.txt');
+      expect(restored.uri, 'cloudreve://my/a.txt');
+      expect(restored.sourcePath, '/tmp/a.txt');
+      expect(restored.size, 1024);
+      expect(restored.progress, 0.5);
+      expect(restored.uploaded, 512);
+      expect(restored.status, UploadStatus.failed);
+      expect(restored.error, '上传已中断');
+    });
+
+    test('缺字段 / 非法状态容错不崩溃', () {
+      final t = UploadTaskModel.fromJson(<String, dynamic>{});
+      expect(t.name, '');
+      expect(t.uri, '');
+      expect(t.size, 0);
+      expect(t.progress, 0);
+      // 未知 / 缺失状态兜底为 failed（restore 时未完成任务按失败处理）
+      expect(t.status, UploadStatus.failed);
+    });
+  });
+
+  group('DownloadTaskModel 序列化', () {
+    test('toJson → fromJson 往返保持字段一致', () {
+      final t = DownloadTaskModel(
+        name: 'b.zip',
+        savePath: '/x/b.zip',
+        sourceUrl: 'http://u/b.zip',
+        systemDownloads: true,
+      )
+        ..totalSize = 2048
+        ..progress = 1
+        ..downloaded = 2048
+        ..status = DownloadStatus.finished;
+      final restored = DownloadTaskModel.fromJson(t.toJson());
+      expect(restored.name, 'b.zip');
+      expect(restored.savePath, '/x/b.zip');
+      expect(restored.sourceUrl, 'http://u/b.zip');
+      expect(restored.systemDownloads, true);
+      expect(restored.totalSize, 2048);
+      expect(restored.progress, 1);
+      expect(restored.downloaded, 2048);
+      expect(restored.status, DownloadStatus.finished);
+    });
+
+    test('缺字段容错不崩溃', () {
+      final t = DownloadTaskModel.fromJson(<String, dynamic>{});
+      expect(t.name, '');
+      expect(t.sourceUrl, '');
+      expect(t.totalSize, 0);
+      expect(t.progress, 0);
+      expect(t.status, DownloadStatus.failed);
+    });
+  });
+}

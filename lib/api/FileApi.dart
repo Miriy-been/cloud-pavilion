@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:cloudpavilion/exception/BusinessException.dart';
 import 'package:cloudpavilion/exception/DebugReportException.dart';
 import 'package:cloudpavilion/exception/LockConflictException.dart';
 import 'package:cloudpavilion/util/DioUtil.dart';
@@ -177,15 +178,20 @@ class FileApi {
   }
 
   /// 删除（默认进回收站；skipSoftDelete=true 为彻底删除）
-  /// 若目标被占用（锁冲突 Code=40073），抛出 [LockConflictException] 供「强制解锁」处理
+  /// 若目标被占用（锁冲突 Code=40073），抛出 [LockConflictException] 供「强制解锁」处理；
+  /// 其它非 0 业务码（无权限 / 参数错误等）由 `DioUtil.request` 统一抛 [BusinessException]
   static Future<void> deleteFiles(List<String> uris,
       {bool skipSoftDelete = false}) async {
-    final resp = await DioUtil().request('/api/v4/file',
-        method: DioMethod.delete,
-        data: {'uris': uris, 'skip_soft_delete': skipSoftDelete});
-    final code = _codeOf(resp);
-    if (code == 40073) {
-      throw LockConflictException(_conflictTokens(resp));
+    try {
+      await DioUtil().request('/api/v4/file',
+          method: DioMethod.delete,
+          data: {'uris': uris, 'skip_soft_delete': skipSoftDelete});
+    } on BusinessException catch (e) {
+      // 文件被占用（40073）：抛 LockConflictException 供「强制解锁」处理
+      if (e.code == 40073) {
+        throw LockConflictException(_conflictTokens(e.data));
+      }
+      rethrow;
     }
     invalidateListCache();
   }
@@ -197,19 +203,10 @@ class FileApi {
         method: DioMethod.delete, data: {'tokens': tokens});
   }
 
-  /// 读取响应中的业务码（Map 可能为 null / 非 int）
-  static int? _codeOf(dynamic data) {
-    final c = data is Map ? data['code'] : null;
-    if (c is int) return c;
-    if (c is num) return c.toInt();
-    return null;
-  }
-
-  /// 从锁冲突响应 data 中提取各文件的解锁 token
+  /// 从锁冲突响应 data（[BusinessException.data]）中提取各文件的解锁 token
   static List<String> _conflictTokens(dynamic data) {
-    final d = data is Map ? data['data'] : null;
-    if (d is List) {
-      return d
+    if (data is List) {
+      return data
           .map<String?>((c) => c is Map ? c['token']?.toString() : null)
           .whereType<String>()
           .toList();

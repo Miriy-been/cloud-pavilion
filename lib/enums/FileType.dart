@@ -112,6 +112,10 @@ enum FileType {
   static bool isVideo(int type, String name) =>
       _resolve(type, name) == VIDEO;
 
+  /// 是否为文档文件（网格视图缩略图用）
+  static bool isDoc(int type, String name) =>
+      _resolve(type, name) == DOC;
+
   /// 当前主题模式下的前景色（图标颜色）
   static Color getColorByValue(int type, String name) =>
       _resolve(type, name).fg;

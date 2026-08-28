@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/exception/LockConflictException.dart';
+import 'ErrorText.dart';
 
 /// 删除并处理「文件被占用」锁冲突（前缀 Storage 页 `batchDelete` 的解锁逻辑）。
 ///
 /// - 正常：删除成功返回 `true`。
 /// - 命中 [LockConflictException]：弹「强制解锁」确认；确认后解锁并重试删除，
 ///   成功返回 `true`；用户选择取消返回 `false`。
-/// - 其它异常（网络等）不在本处吞掉，向上抛给调用方自行提示。
+/// - 其它异常（网络 / 非 0 业务码等）：统一提示失败原因并返回 `false`，
+///   避免调用方误以为删除成功（静默失败）。
 Future<bool> deleteWithUnlock(
   BuildContext context,
   List<String> uris, {
@@ -25,8 +28,21 @@ Future<bool> deleteWithUnlock(
       content: '部分文件正在被使用，无法删除。如果你是文件所有者，可以强制解锁后重试。',
     );
     if (unlock != true || !context.mounted) return false;
-    await FileApi.unlockFiles(e.tokens);
-    await FileApi.deleteFiles(uris, skipSoftDelete: skipSoftDelete);
-    return true;
+    try {
+      await FileApi.unlockFiles(e.tokens);
+      await FileApi.deleteFiles(uris, skipSoftDelete: skipSoftDelete);
+      return true;
+    } catch (err) {
+      _showDeleteError(err);
+      return false;
+    }
+  } catch (e) {
+    _showDeleteError(e);
+    return false;
   }
+}
+
+/// 删除失败统一提示（网络错误 / 服务端业务失败；全局 toast 不依赖 context）
+void _showDeleteError(Object e) {
+  SmartDialog.showToast('删除失败：${errorText(e, '未知错误')}');
 }

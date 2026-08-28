@@ -197,11 +197,15 @@ class FileTile extends StatelessWidget {
   final String name;
   final double size;
 
+  /// 图标圆角；默认随尺寸缩放，画廊模式传 0 保持直角原始形状
+  final double? borderRadius;
+
   const FileTile({
     super.key,
     required this.type,
     required this.name,
     this.size = 44,
+    this.borderRadius,
   });
 
   @override
@@ -211,7 +215,8 @@ class FileTile extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: FileType.getBgColorByValue(type, name),
-        borderRadius: BorderRadius.circular(size * 0.27),
+        borderRadius:
+            BorderRadius.circular(borderRadius ?? size * 0.27),
       ),
       child: Icon(
         FileType.getIconByTypeAndName(type, name),
@@ -312,7 +317,15 @@ class GridThumb extends StatefulWidget {
   final FileItemModel file;
   final double size;
 
-  const GridThumb({super.key, required this.file, required this.size});
+  /// 缩略图圆角（画廊模式传 0 实现直角铺满）
+  final double borderRadius;
+
+  const GridThumb({
+    super.key,
+    required this.file,
+    required this.size,
+    this.borderRadius = 12,
+  });
 
   @override
   State<GridThumb> createState() => _GridThumbState();
@@ -338,10 +351,11 @@ class _GridThumbState extends State<GridThumb> {
   }
 
   void _maybeLoad() {
-    // 图片 / 视频 / 音频（封面缩略图）均尝试加载缩略图
+    // 图片 / 视频 / 音频 / 文档（封面缩略图）均尝试加载缩略图
     if (FileType.isImage(widget.file.type, widget.file.name) ||
         FileType.isVideo(widget.file.type, widget.file.name) ||
-        FileType.isAudio(widget.file.type, widget.file.name)) {
+        FileType.isAudio(widget.file.type, widget.file.name) ||
+        FileType.isDoc(widget.file.type, widget.file.name)) {
       _load();
     }
   }
@@ -374,11 +388,14 @@ class _GridThumbState extends State<GridThumb> {
   @override
   Widget build(BuildContext context) {
     final fallback = FileTile(
-        type: widget.file.type, name: widget.file.name, size: widget.size);
+        type: widget.file.type,
+        name: widget.file.name,
+        size: widget.size,
+        borderRadius: widget.borderRadius);
     final url = _url;
     if (url == null || url.isEmpty) return fallback;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(widget.borderRadius),
       child: CachedImage(
         url: url,
         width: widget.size,

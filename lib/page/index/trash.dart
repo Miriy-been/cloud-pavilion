@@ -3,6 +3,7 @@ import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/util/ErrorText.dart';
 import 'package:cloudpavilion/util/unlockDelete.dart';
 
 /// 回收站管理页
@@ -61,7 +62,15 @@ class _TrashPageState extends State<TrashPage> {
 
   /// 恢复文件
   Future<void> _restore(FileItemModel obj) async {
-    await FileApi.restoreFiles([obj.path]);
+    try {
+      await FileApi.restoreFiles([obj.path]);
+    } catch (e) {
+      // 网络 / 业务失败：明确提示，避免「已恢复」但实际未恢复
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(appSnack('恢复失败：${errorText(e, '未知错误')}'));
+      return;
+    }
     _load(showLoading: false, useCache: false);
     if (!mounted) return;
     ScaffoldMessenger.of(context)
