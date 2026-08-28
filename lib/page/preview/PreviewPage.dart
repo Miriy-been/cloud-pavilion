@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +11,7 @@ import 'package:cloudpavilion/model/FileItemModel.dart';
 import 'package:cloudpavilion/page/tools/ShareSheet.dart';
 import 'package:cloudpavilion/util/DownloadManager.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
+import 'package:cloudpavilion/util/unlockDelete.dart';
 import 'package:video_player/video_player.dart';
 
 /// 文件在线预览页（图片 / 视频 / 文本；音频由 AudioPlayerPage 处理）
@@ -45,6 +48,12 @@ class _PreviewPageState extends State<PreviewPage> {
   bool _editing = false;
   bool _editLoading = false;
   bool _immersive = false;
+
+  /// 视频控制条拖拽中的临时进度（毫秒），松手后 seek 并清空
+  double? _dragValue;
+
+  /// 视频音量静音切换前记住的原音量
+  double _lastVolume = 1.0;
 
   /// 是否有修改（重命名 / 删除），返回列表时通知刷新
   bool _changed = false;
@@ -100,6 +109,7 @@ class _PreviewPageState extends State<PreviewPage> {
   void _setupVideo() {
     _videoController?.dispose();
     _videoController = null;
+    _dragValue = null;
     if (!_isVideo) return;
     _urlOf(_current.path).then((url) {
       if (!mounted) return;
@@ -203,8 +213,8 @@ class _PreviewPageState extends State<PreviewPage> {
     );
     if (!confirmed || !mounted) return;
     try {
-      await FileApi.deleteFiles([_current.path]);
-      if (!mounted) return;
+      final ok = await deleteWithUnlock(context, [_current.path]);
+      if (!ok || !mounted) return;
       // 返回列表并通知刷新
       _changed = true;
       Navigator.pop(context, _changed);
@@ -424,7 +434,7 @@ class _PreviewPageState extends State<PreviewPage> {
                     : _buildPage(_current)),
           ),
           if (!_editing) _buildTopBar(),
-          _buildActionBar(),
+          _buildBottomControlGroup(),
         ],
       ),
     );
@@ -530,12 +540,136 @@ class _PreviewPageState extends State<PreviewPage> {
     if (item.path != _current.path || c == null || !c.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
+    // 视频铺满内容底层，不叠加任何控件；控制胶囊位于底部浮层组中
     return Center(
       child: AspectRatio(
         aspectRatio: c.value.aspectRatio,
         child: VideoPlayer(c),
       ),
     );
+  }
+
+  /// 视频播放控制胶囊：系统相册磨砂半透明大圆角胶囊，
+  /// 播放 / 当前时间 / 可拖拽进度 / 总时长 / 音量；
+  /// 显隐由底部浮层组统一控制，位置跟随底部菜单栏
+  Widget _buildVideoControls(VideoPlayerController c) {
+    // 拦截点击，避免胶囊空白区域误触发「点击画面切换显隐」
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {},
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: ValueListenableBuilder<VideoPlayerValue>(
+              valueListenable: c,
+              builder: (context, value, _) {
+                final maxMs = value.duration.inMilliseconds > 0
+                    ? value.duration.inMilliseconds.toDouble()
+                    : 1.0;
+                final curMs = (_dragValue ??
+                        value.position.inMilliseconds.toDouble())
+                    .clamp(0.0, maxMs);
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  child: Row(
+                    children: [
+                      _ctrlIconButton(
+                        icon: value.isPlaying
+                            ? Icons.pause
+                            : Icons.play_arrow,
+                        onTap: _togglePlay,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(_fmt(value.position),
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.white)),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 2,
+                            activeTrackColor: Colors.white,
+                            inactiveTrackColor:
+                                Colors.white.withValues(alpha: 0.25),
+                            thumbColor: Colors.white,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 5),
+                            overlayShape: SliderComponentShape.noOverlay,
+                          ),
+                          child: Slider(
+                            value: curMs,
+                            max: maxMs,
+                            onChanged: (v) =>
+                                setState(() => _dragValue = v),
+                            onChangeEnd: (v) {
+                              c.seekTo(
+                                  Duration(milliseconds: v.round()));
+                              setState(() => _dragValue = null);
+                            },
+                          ),
+                        ),
+                      ),
+                      Text(_fmt(value.duration),
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.white)),
+                      const SizedBox(width: 3),
+                      _ctrlIconButton(
+                        icon: value.volume > 0
+                            ? Icons.volume_up
+                            : Icons.volume_off,
+                        onTap: _toggleVolume,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 控制条上的小按钮（白色图标，紧凑）
+  Widget _ctrlIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return IconButton(
+      icon: Icon(icon, color: Colors.white, size: 18),
+      onPressed: onTap,
+      padding: const EdgeInsets.all(3),
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  /// 视频音量静音 / 恢复（记住切换前音量）
+  void _toggleVolume() {
+    final c = _videoController;
+    if (c == null || !c.value.isInitialized) return;
+    if (c.value.volume > 0) {
+      _lastVolume = c.value.volume;
+      c.setVolume(0);
+    } else {
+      c.setVolume(_lastVolume > 0 ? _lastVolume : 1.0);
+    }
+  }
+
+  /// 视频时长格式化：mm:ss，超过 1 小时为 h:mm:ss
+  String _fmt(Duration d) {
+    if (d.isNegative) d = Duration.zero;
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    String two(int v) => v.toString().padLeft(2, '0');
+    return h > 0 ? '$h:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
   }
 
   Widget _buildTextViewer(FileItemModel item) {
@@ -591,9 +725,44 @@ class _PreviewPageState extends State<PreviewPage> {
     );
   }
 
-  /// 底部快捷操作栏（样式参考多选功能栏，按文件类型差异化展示）
-  /// 文本编辑态替换为「取消 / 保存」；沉浸时滑出屏幕
-  Widget _buildActionBar() {
+  /// 底部浮层组：视频控制胶囊 + 快捷操作栏，成对滑入 / 滑出。
+  /// 胶囊位于操作栏上方固定间距，位置由底部菜单栏决定
+  Widget _buildBottomControlGroup() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 200),
+        offset: _immersive ? const Offset(0, 1) : Offset.zero,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: _immersive ? 0 : 1,
+          child: IgnorePointer(
+            ignoring: _immersive,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 视频控制胶囊：位于操作栏上方、左右留边距，跟随底部组一起滑入 / 滑出
+                if (_isVideo && _videoController != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: _buildVideoControls(_videoController!),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildActionBarBody(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 底部快捷操作栏主体（样式参考多选功能栏，按文件类型差异化展示）
+  /// 文本编辑态替换为「取消 / 保存」
+  Widget _buildActionBarBody() {
     final Widget bar;
     if (_editing) {
       bar = Row(
@@ -628,14 +797,6 @@ class _PreviewPageState extends State<PreviewPage> {
             onTap: _showReaderSettings,
           ),
         ],
-        if (_isVideo)
-          _PreviewAction(
-            icon: _videoController?.value.isPlaying == true
-                ? Icons.pause
-                : Icons.play_arrow,
-            label: '播放',
-            onTap: _togglePlay,
-          ),
         _PreviewAction(
           icon: Icons.download_outlined,
           label: '下载',
@@ -664,27 +825,11 @@ class _PreviewPageState extends State<PreviewPage> {
         children: [for (final it in items) Expanded(child: it)],
       );
     }
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: AnimatedSlide(
-        duration: const Duration(milliseconds: 200),
-        offset: _immersive ? const Offset(0, 1) : Offset.zero,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 200),
-          opacity: _immersive ? 0 : 1,
-          child: IgnorePointer(
-            ignoring: _immersive,
-            child: Container(
-              color: AppColors.surface,
-              child: SafeArea(
-                top: false,
-                child: SizedBox(height: 62, child: bar),
-              ),
-            ),
-          ),
-        ),
+    return Container(
+      color: AppColors.surface,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(height: 62, child: bar),
       ),
     );
   }

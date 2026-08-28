@@ -3,6 +3,7 @@ import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/util/unlockDelete.dart';
 
 /// 回收站管理页
 class TrashPage extends StatefulWidget {
@@ -72,7 +73,8 @@ class _TrashPageState extends State<TrashPage> {
     final confirmed = await _confirm('彻底删除',
         '确定永久删除「${obj.name}」吗？此操作不可恢复');
     if (confirmed != true) return;
-    await FileApi.deleteFiles([obj.path], skipSoftDelete: true);
+    final ok = await deleteWithUnlock(context, [obj.path], skipSoftDelete: true);
+    if (!ok || !mounted) return;
     _load(showLoading: false, useCache: false);
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -85,9 +87,10 @@ class _TrashPageState extends State<TrashPage> {
     final confirmed = await _confirm('清空回收站',
         '确定永久删除回收站中的全部 ${_items.length} 项吗？此操作不可恢复');
     if (confirmed != true) return;
-    await FileApi.deleteFiles(
-        _items.map((e) => e.path).toList(),
+    final ok = await deleteWithUnlock(
+        context, _items.map((e) => e.path).toList(),
         skipSoftDelete: true);
+    if (!ok || !mounted) return;
     _load(showLoading: false, useCache: false);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(appSnack('已清空回收站'));

@@ -5,10 +5,12 @@ import 'package:cloudpavilion/api/ShareApi.dart';
 import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/enums/FileType.dart';
+import 'package:cloudpavilion/exception/LockConflictException.dart';
 import 'package:cloudpavilion/model/FileItemModel.dart';
 import 'package:cloudpavilion/page/tools/FolderPicker.dart';
 import 'package:cloudpavilion/page/tools/ShareSheet.dart';
 import 'package:cloudpavilion/util/DownloadManager.dart';
+import 'package:cloudpavilion/util/ErrorText.dart';
 import 'package:cloudpavilion/util/SpUtils.dart';
 
 /// 文件多选与批量操作（存储页 / 分类页共用）
@@ -214,7 +216,29 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
     final confirmed = await showConfirmDialog(
         '批量删除', '确定将选中的 ${items.length} 项移入回收站吗？');
     if (confirmed != true) return;
-    await FileApi.deleteFiles(items.map((e) => e.path).toList());
+    final uris = items.map((e) => e.path).toList();
+    try {
+      await FileApi.deleteFiles(uris);
+    } on LockConflictException catch (e) {
+      // 文件被占用：像网页版一样提供「强制解锁」入口，解锁后重试删除
+      if (!mounted) return;
+      final unlock = await showConfirmDialog(
+          '文件被占用',
+          '部分文件正在被使用，无法删除。如果你是文件所有者，可以强制解锁后重试。');
+      if (unlock != true) return;
+      try {
+        await FileApi.unlockFiles(e.tokens);
+        await FileApi.deleteFiles(uris);
+      } catch (err) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(appSnack('删除失败：${errorText(err, '未知错误')}'));
+        return;
+      }
+      exitSelection();
+      afterAction();
+      return;
+    }
     exitSelection();
     afterAction();
   }

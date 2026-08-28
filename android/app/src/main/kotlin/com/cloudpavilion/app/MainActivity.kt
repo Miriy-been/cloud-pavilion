@@ -3,6 +3,7 @@ package com.cloudpavilion.app
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -18,6 +19,9 @@ import java.io.File
 /// audio_service 的媒体按钮支持通过 provideFlutterEngine 返回其插件 engine 复刻（等价 AudioServiceActivity）。
 class MainActivity : FlutterFragmentActivity() {
     private val channelName = "cloudreve/downloads"
+    private val uploadFgChannelName = "cloudreve/upload_fg"
+    private val downloadFgChannelName = "cloudreve/download_fg"
+    private val notificationPermReqCode = 2001
 
     override fun provideFlutterEngine(context: Context): FlutterEngine =
         AudioServicePlugin.getFlutterEngine(context)
@@ -45,6 +49,56 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     "openAllFilesAccess" -> {
                         openAllFilesAccess()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        // 后台上传前台服务：由 Dart 侧在任务开始 / 更新 / 结束时分发
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, uploadFgChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "start" -> {
+                        ensureNotificationPermission()
+                        val count = call.argument<Int>("count") ?: 1
+                        val file = call.argument<String>("file") ?: ""
+                        UploadForegroundService.start(this, count, file)
+                        result.success(null)
+                    }
+                    "update" -> {
+                        val count = call.argument<Int>("count") ?: 1
+                        val file = call.argument<String>("file") ?: ""
+                        val percent = call.argument<Int>("percent") ?: 0
+                        UploadForegroundService.update(this, count, file, percent)
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        UploadForegroundService.stop(this)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        // 后台下载前台服务：由 Dart 侧在任务开始 / 更新 / 结束时分发
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, downloadFgChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "start" -> {
+                        ensureNotificationPermission()
+                        val count = call.argument<Int>("count") ?: 1
+                        val file = call.argument<String>("file") ?: ""
+                        DownloadForegroundService.start(this, count, file)
+                        result.success(null)
+                    }
+                    "update" -> {
+                        val count = call.argument<Int>("count") ?: 1
+                        val file = call.argument<String>("file") ?: ""
+                        val percent = call.argument<Int>("percent") ?: 0
+                        DownloadForegroundService.update(this, count, file, percent)
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        DownloadForegroundService.stop(this)
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -126,6 +180,19 @@ class MainActivity : FlutterFragmentActivity() {
             } catch (_: Exception) {
                 // 设备不支持该设置页，忽略
             }
+        }
+    }
+
+    /// Android 13+ 请求通知权限（仅上传开始时请求一次；拒绝不影响前台服务运行）
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                notificationPermReqCode
+            )
         }
     }
 

@@ -338,8 +338,9 @@ class _GridThumbState extends State<GridThumb> {
   }
 
   void _maybeLoad() {
-    // 图片与音频（封面缩略图）均尝试加载缩略图
+    // 图片 / 视频 / 音频（封面缩略图）均尝试加载缩略图
     if (FileType.isImage(widget.file.type, widget.file.name) ||
+        FileType.isVideo(widget.file.type, widget.file.name) ||
         FileType.isAudio(widget.file.type, widget.file.name)) {
       _load();
     }

@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- 后台上传前台服务（dataSync）+ Android 13+ 通知权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
             android:label="@string/app_name"
             android:name="${applicationName}"
@@ -55,6 +58,16 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON"/>
             </intent-filter>
         </receiver>
+        <!-- 后台上传前台服务（dataSync）：有上传任务时保持进程存活 -->
+        <service android:name=".UploadForegroundService"
+                android:exported="false"
+                android:foregroundServiceType="dataSync"
+                tools:ignore="Instantiatable"/>
+        <!-- 后台下载前台服务（dataSync）：有下载任务时保持进程存活 -->
+        <service android:name=".DownloadForegroundService"
+                android:exported="false"
+                android:foregroundServiceType="dataSync"
+                tools:ignore="Instantiatable"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

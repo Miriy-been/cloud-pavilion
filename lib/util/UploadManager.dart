@@ -8,6 +8,7 @@ import 'package:cloudpavilion/model/UploadTaskModel.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'ErrorText.dart';
 import 'SpUtils.dart';
+import 'UploadForegroundService.dart';
 
 /// 后台上传任务管理器（全局单例）
 /// 上传在后台执行，不阻塞页面；任务增删 / 状态变化时通知监听者，
@@ -54,11 +55,18 @@ class UploadManager extends ChangeNotifier {
   /// 进度节流：上次通知时间
   DateTime _lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// 上传前台服务是否已启动
+  bool _fgActive = false;
+
+  /// 前台通知更新节流：上次更新时间
+  DateTime _lastFgUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+
   /// 状态变化：立即通知并持久化
   void _notifyImmediate() {
     _lastNotify = DateTime.now();
     notifyListeners();
     _persist();
+    _syncForeground(force: true);
   }
 
   /// 进度高频回调：最多每 250ms 通知一次，不触发持久化
@@ -67,6 +75,37 @@ class UploadManager extends ChangeNotifier {
     if (now.difference(_lastNotify).inMilliseconds >= 250) {
       _lastNotify = now;
       notifyListeners();
+    }
+    _syncForeground();
+  }
+
+  /// 同步上传前台服务：有任务上传中时启动 / 更新常驻通知，全部结束后自动停止。
+  /// [force] 用于状态变化（任务增删、完成）时的即时同步；进度更新走下面的 1s 节流。
+  void _syncForeground({bool force = false}) {
+    final active =
+        tasks.where((t) => t.status == UploadStatus.uploading).toList();
+    if (active.isEmpty) {
+      if (_fgActive) {
+        _fgActive = false;
+        UploadForegroundService.stop();
+      }
+      return;
+    }
+    // 进度更新最多每秒通知一次，避免频繁刷新系统通知
+    final now = DateTime.now();
+    if (!force && now.difference(_lastFgUpdate).inMilliseconds < 1000) {
+      return;
+    }
+    _lastFgUpdate = now;
+    final count = active.length;
+    final file = active.first.name;
+    final avg = active.fold<double>(0, (a, t) => a + t.progress) / count;
+    final percent = (avg * 100).round().clamp(0, 100);
+    if (_fgActive) {
+      UploadForegroundService.update(count, file, percent);
+    } else {
+      _fgActive = true;
+      UploadForegroundService.start(count, file);
     }
   }
 
@@ -115,6 +154,7 @@ class UploadManager extends ChangeNotifier {
     _speed.clear();
     _sessions.clear();
     notifyListeners();
+    _syncForeground(force: true);
     await restore();
   }
 

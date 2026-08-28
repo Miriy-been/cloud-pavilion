@@ -316,7 +316,7 @@ class _DownloadRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 9),
-                if (downloading)
+                if (downloading) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
                     child: LinearProgressIndicator(
@@ -325,8 +325,30 @@ class _DownloadRow extends StatelessWidget {
                       color: AppColors.primary,
                       backgroundColor: AppColors.line,
                     ),
-                  )
-                else
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Text(
+                        _formatSpeed(task.speed),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.ink3,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${formatBytes(task.downloaded)} / ${formatBytes(task.totalSize)}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.ink3,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else
                   Text(
                     ok
                         ? task.savePath

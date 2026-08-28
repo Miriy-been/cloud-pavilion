@@ -108,6 +108,10 @@ enum FileType {
   static bool isAudio(int type, String name) =>
       _resolve(type, name) == AUDIO;
 
+  /// 是否为视频文件（网格视图缩略图用）
+  static bool isVideo(int type, String name) =>
+      _resolve(type, name) == VIDEO;
+
   /// 当前主题模式下的前景色（图标颜色）
   static Color getColorByValue(int type, String name) =>
       _resolve(type, name).fg;

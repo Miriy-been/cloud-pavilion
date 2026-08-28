@@ -9,6 +9,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'ErrorText.dart';
 import 'SpUtils.dart';
+import 'DownloadForegroundService.dart';
 
 /// 本地下载任务管理器（全局单例）
 /// 任务增删 / 状态变化时通知监听者；进度高频回调时进行节流通知
@@ -39,11 +40,21 @@ class DownloadManager extends ChangeNotifier {
   /// 进度节流：上次通知时间
   DateTime _lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// 每个任务的下载速度计算状态
+  final Map<DownloadTaskModel, _DownloadSpeedState> _speed = {};
+
+  /// 下载前台服务是否已启动
+  bool _fgActive = false;
+
+  /// 前台通知更新节流：上次更新时间
+  DateTime _lastFgUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+
   /// 状态变化：立即通知并持久化
   void _notifyImmediate() {
     _lastNotify = DateTime.now();
     notifyListeners();
     _persist();
+    _syncForeground(force: true);
   }
 
   /// 进度高频回调：最多每 250ms 通知一次，不触发持久化
@@ -52,6 +63,51 @@ class DownloadManager extends ChangeNotifier {
     if (now.difference(_lastNotify).inMilliseconds >= 250) {
       _lastNotify = now;
       notifyListeners();
+    }
+    _syncForeground();
+  }
+
+  /// 同步下载前台服务：有任务下载中时启动 / 更新常驻通知，全部结束后自动停止。
+  void _syncForeground({bool force = false}) {
+    final active = tasks
+        .where((t) => t.status == DownloadStatus.downloading)
+        .toList();
+    if (active.isEmpty) {
+      if (_fgActive) {
+        _fgActive = false;
+        DownloadForegroundService.stop();
+      }
+      return;
+    }
+    final now = DateTime.now();
+    if (!force && now.difference(_lastFgUpdate).inMilliseconds < 1000) {
+      return;
+    }
+    _lastFgUpdate = now;
+    final count = active.length;
+    final file = active.first.name;
+    final avg = active.fold<double>(0, (a, t) => a + t.progress) / count;
+    final percent = (avg * 100).round().clamp(0, 100);
+    if (_fgActive) {
+      DownloadForegroundService.update(count, file, percent);
+    } else {
+      _fgActive = true;
+      DownloadForegroundService.start(count, file);
+    }
+  }
+
+  /// 更新任务已下载字节数与实时速度（指数滑动平均，平滑抖动）
+  void _updateProgress(DownloadTaskModel task, int received) {
+    task.downloaded = received;
+    final s = _speed[task] ??= _DownloadSpeedState();
+    final now = DateTime.now();
+    final dt = now.difference(s.lastTime).inMilliseconds;
+    if (dt >= 400) {
+      final delta = (received - s.lastBytes) / (dt / 1000);
+      s.speed = s.speed > 0 ? s.speed * 0.7 + delta * 0.3 : delta;
+      s.lastBytes = received.toDouble();
+      s.lastTime = now;
+      task.speed = s.speed;
     }
   }
 
@@ -111,13 +167,16 @@ class DownloadManager extends ChangeNotifier {
       }
     }
     tasks.clear();
+    _speed.clear();
     notifyListeners();
+    _syncForeground(force: true);
     await restore();
   }
 
   /// 清空已完成 / 已取消 / 失败的历史记录（保留进行中的任务）
   Future<void> clearFinished() async {
     tasks.removeWhere((t) => t.status != DownloadStatus.downloading);
+    _speed.removeWhere((t, _) => t.status != DownloadStatus.downloading);
     _notifyImmediate();
   }
 
@@ -224,10 +283,13 @@ class DownloadManager extends ChangeNotifier {
         onReceiveProgress: (received, total) {
           task.totalSize = total;
           task.progress = total > 0 ? received / total : 0;
+          _updateProgress(task, received);
           _notifyThrottled();
         },
       );
       task.progress = 1;
+      task.downloaded = task.totalSize;
+      task.speed = 0;
       if (systemDownloads) {
         task.savePath = await _moveToSystemDownloads(task.name, workingPath);
       }
@@ -238,14 +300,14 @@ class DownloadManager extends ChangeNotifier {
         task.status = DownloadStatus.cancelled;
       } else {
         task.status = DownloadStatus.failed;
-        task.error = e.toString();
-        SmartDialog.showToast('下载「${task.name}」失败：${errorText(e, '网络错误')}');
+        task.error = errorText(e, '网络错误');
+        SmartDialog.showToast('下载「${task.name}」失败：${task.error}');
       }
       _notifyImmediate();
     } catch (e) {
       task.status = DownloadStatus.failed;
-      task.error = e.toString();
-      SmartDialog.showToast('下载「${task.name}」失败：${errorText(e, '保存文件失败')}');
+      task.error = errorText(e, '保存文件失败');
+      SmartDialog.showToast('下载「${task.name}」失败：${task.error}');
       // 转入系统下载目录失败：清理临时文件
       if (systemDownloads) {
         final tmp = File(workingPath);
@@ -254,6 +316,7 @@ class DownloadManager extends ChangeNotifier {
       _notifyImmediate();
     } finally {
       _tokens.remove(task);
+      _speed.remove(task);
     }
   }
 
@@ -276,4 +339,11 @@ class _StoragePermissionException implements Exception {
   _StoragePermissionException(this.message);
   @override
   String toString() => message;
+}
+
+/// 单个任务的实时下载速度计算状态
+class _DownloadSpeedState {
+  double lastBytes = 0;
+  DateTime lastTime = DateTime.now();
+  double speed = 0;
 }

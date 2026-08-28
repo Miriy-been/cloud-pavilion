@@ -15,6 +15,12 @@ class DownloadTaskModel {
   final bool systemDownloads;
   int totalSize;
   double progress; // 0 ~ 1
+
+  /// 已下载字节数（实时进度展示用）
+  int downloaded = 0;
+
+  /// 当前下载速度（字节/秒，实时进度展示用）
+  double speed = 0;
   DownloadStatus status;
   String? error;
 
@@ -37,6 +43,7 @@ class DownloadTaskModel {
         'systemDownloads': systemDownloads,
         'totalSize': totalSize,
         'progress': progress,
+        'downloaded': downloaded,
         'status': status.name,
         'error': error,
       };
@@ -53,5 +60,5 @@ class DownloadTaskModel {
         status: DownloadStatus.values.asNameMap()[json['status'] as String?] ??
             DownloadStatus.failed,
         error: json['error'] as String?,
-      );
+      )..downloaded = (json['downloaded'] as num?)?.toInt() ?? 0;
 }
