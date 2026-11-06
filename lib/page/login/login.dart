@@ -213,10 +213,11 @@ class _LoginState extends State<Login> {
             result['msg']?.toString() ?? '邮箱或密码错误');
       }
 
+      if (!mounted || !context.mounted) return;
       await _finalizeLogin(context, result, siteUrl, _emailController.text);
     } catch (e) {
       // 登录失败：显式提示（不依赖全局异常处理器）
-      if (mounted) _showError(context, e);
+      if (mounted && context.mounted) _showError(context, e);
     }
   }
 
@@ -292,12 +293,18 @@ class _LoginState extends State<Login> {
     // 加载本地账号
     Map<String, dynamic> userInfo = {
       'data': result['data']['user'],
-      'token': token,
       'userName': userName,
       'siteName': _siteName,
       'siteUrl': siteUrl
     };
     convertAvatar(siteUrl, userInfo['data']);
+
+    // token 单独存入安全存储（accounts 中不再保留明文副本）
+    await TokenManager.saveSnapshot(
+      siteUrl: siteUrl,
+      userName: userName,
+      token: Map<String, dynamic>.from(token as Map),
+    );
 
     final accountList = <String>[];
     accountList.add(json.encode(userInfo));

@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloudpavilion/exception/BusinessException.dart';
 import 'package:cloudpavilion/exception/NotLoginException.dart';
+import 'package:cloudpavilion/util/ErrorText.dart';
+import 'package:cloudpavilion/util/AuthState.dart';
+import 'package:cloudpavilion/util/TokenAutoRefresh.dart';
 import 'package:cloudpavilion/util/TokenManager.dart';
 import 'package:flutter_smart_dialog/src/smart_dialog.dart';
 import '../exception/DebugReportException.dart';
@@ -39,34 +43,24 @@ class AppExceptionHandle {
     // Vibration.vibrate(duration: 1000);
     if (error is DebugReportException) {
       SmartDialog.showToast(error.message);
-    } else if (error is FormatException) {
-      SmartDialog.showToast(error.message);
     } else if (error is NotLoginException) {
-      // 登录过期
+      // 登录过期：清除凭据并同步全局登录态，让根路由守卫切回登录页。
+      // 仅 clear() 而不改 AuthState / isLogin 会让 UI 停留在已登录的
+      // 内部页面，用户能看到界面但所有请求都在失败。
       TokenManager.clear();
+      SpUtils.setBool('isLogin', false);
+      AuthState.isLoggedIn.value = false;
+      TokenAutoRefresh.instance.stop();
       SmartDialog.showToast("登录已过期,请重新登录");
     } else if (error is DioException) {
-      final resp = error.response;
-      if (resp != null) {
-        // 显示服务器返回的具体错误信息
-        final body = resp.data;
-        if (body is Map && body['msg'] != null && body['msg'].toString().isNotEmpty) {
-          SmartDialog.showToast(body['msg'].toString());
-        } else if (body is String && body.isNotEmpty) {
-          SmartDialog.showToast(body);
-        } else {
-          SmartDialog.showToast('请求失败 (${resp.statusCode})');
-        }
-      } else if (error.type == DioExceptionType.unknown) {
-        SmartDialog.showToast('网络连接失败，请检查网络后重试');
-      } else if (error.type == DioExceptionType.connectionTimeout) {
-        SmartDialog.showToast('${error.type.name} 连接超时');
-      } else {
-        SmartDialog.showToast(error.type.name);
-      }
+      // 统一走 errorText：与各页面局部提示使用同一套文案与中文化规则
+      SmartDialog.showToast(errorText(error, '请求失败'));
+    } else if (error is BusinessException) {
+      SmartDialog.showToast(errorText(error, '请求失败'));
     } else {
-      SmartDialog.showToast("系统错误");
-      print(stack);
+      // 未知异常：不向用户抛技术细节，但仍打印栈便于排查
+      SmartDialog.showToast(errorText(error, '系统错误'));
+      debugPrint(stack.toString());
     }
   }
 }

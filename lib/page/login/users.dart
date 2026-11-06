@@ -276,6 +276,8 @@ class _UsersState extends State<Users> {
       }
     }).toList();
     await SpUtils.setStringList('accounts', kept);
+    // 同步删除该账号在安全存储中的 token 快照
+    await TokenManager.deleteSnapshot(siteUrl, userName);
 
     // 若删除的是当前登录账号，一并退出登录
     final curSite = await SpUtils.getString('CurrentBaseUrl');
@@ -302,13 +304,20 @@ class _UsersState extends State<Users> {
     TokenManager.clear();
     await SpUtils.setBool('isLogin', false);
     AuthState.isLoggedIn.value = false;
+    if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, "/home", (route) => false);
   }
 
   /// 切换账号：将该账号的 token 写入当前上下文并回到主页
   /// 设备支持生物识别时，需先指纹验证，防止他人直接代登账号
   Future<void> login(Map<String, dynamic> data) async {
-    final token = data['token'];
+    final siteUrl = (data['siteUrl'] ?? '').toString();
+    final userName = (data['userName'] ?? '').toString();
+    // token 已移至安全存储，优先从快照读取；兼容旧数据仍内嵌 token 的情况
+    final token = await TokenManager.readSnapshot(siteUrl, userName) ??
+        (data['token'] is Map
+            ? Map<String, dynamic>.from(data['token'] as Map)
+            : null);
     if (token == null) {
       SmartDialog.showToast('该账号缺少登录信息，请重新登录');
       return;
@@ -332,9 +341,11 @@ class _UsersState extends State<Users> {
     );
     // 切换账号：清空文件列表 / 元数据缓存，避免串用上一个账号的数据
     FileApi.clearAllCache();
-    await SpUtils.setString('CurrentBaseUrl', data['siteUrl']);
-    await SpUtils.setString('currentUserName', data['userName']);
-    await SpUtils.setString('userInfo', json.encode(data));
+    await SpUtils.setString('CurrentBaseUrl', siteUrl);
+    await SpUtils.setString('currentUserName', userName);
+    // userInfo 不再写入 token（凭据只存安全存储）
+    final userInfo = Map<String, dynamic>.from(data)..remove('token');
+    await SpUtils.setString('userInfo', json.encode(userInfo));
     await SpUtils.setBool('isLogin', true);
     AuthState.isLoggedIn.value = true;
     await SpUtils.setString('currentMenu', FileApi.myRootUri);

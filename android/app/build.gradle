@@ -27,6 +27,18 @@ android {
     compileSdkVersion flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
+    // 正式签名配置：从 android/key.properties 读取（该文件不入库）。
+    // 缺失时 release 回退 debug 签名，保证没有密钥的协作者仍能在本地
+    // `flutter build apk --release` 验证；发布机必须提供 key.properties，
+    // 否则产物不可上架（也意味着签名不一致、无法覆盖安装升级）。
+    def keystoreProperties = new Properties()
+    def keystorePropertiesFile = rootProject.file('key.properties')
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.withReader('UTF-8') { reader ->
+            keystoreProperties.load(reader)
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -55,11 +67,25 @@ android {
         }
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            release {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                // storeFile 相对 android/app/ 解析，而 key.properties 里的
+                // 路径习惯按 android/ 书写，这里显式按项目根目录解析
+                storeFile file("${rootProject.projectDir}/${keystoreProperties['storeFile']}")
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
+            // 有 key.properties 时用正式签名，否则回退 debug（本地验证用）
+            signingConfig keystorePropertiesFile.exists()
+                    ? signingConfigs.release
+                    : signingConfigs.debug
         }
     }
 }

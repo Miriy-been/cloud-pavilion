@@ -84,6 +84,8 @@ class _SecurityPageState extends State<SecurityPage> {
       FileApi.clearAllCache();
       final siteUrl = await SpUtils.getString('CurrentBaseUrl');
       final userName = await SpUtils.getString('currentUserName');
+      // token 已随改密失效：同步删除安全存储中的该账号快照
+      await TokenManager.deleteSnapshot(siteUrl, userName);
       // 移除多账号快照中的该账号：token 已随改密失效，
       // 不应再出现在账户管理页且可被旧 token 登录
       final accounts = await SpUtils.getStringList('accounts');

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloudpavilion/exception/BusinessException.dart';
@@ -146,6 +144,13 @@ class DioUtil {
           '-> ${error.response?.statusCode} ${error.response?.data}');
     }
     if (isAuthExpired && !isTokenEndpoint) {
+      // 已经用新 token 重放过一次仍然 401：说明不是「token 过期」，
+      // 而是账号被禁用 / 服务端拒绝。此时必须停止重试，否则会形成
+      // 「刷新 → 重放 → 再 401 → 再刷新」的死循环（每次都在打服务端）。
+      if (error.requestOptions.extra['_authRetried'] == true) {
+        handler.next(error);
+        return;
+      }
       _retryWithRefresh(error, handler);
       return;
     }
@@ -205,6 +210,8 @@ class DioUtil {
     final token = await TokenManager.getAccessToken();
     error.requestOptions.headers[authHeaderName] = 'Bearer $token';
     error.requestOptions.headers[altAuthHeaderName] = 'Bearer $token';
+    // 标记已完成一次认证重试：重放后仍 401 时不再触发刷新，避免死循环
+    error.requestOptions.extra['_authRetried'] = true;
     try {
       final response = await _dio.fetch(error.requestOptions);
       handler.resolve(response);
@@ -256,33 +263,24 @@ class DioUtil {
     await _syncAccountSnapshot(data);
   }
 
-  /// 将刷新得到的新 token 写回 accounts 快照（当前账号）
+  /// 将刷新得到的新 token 写回当前账号的快照
+  ///
+  /// 快照存在安全存储（按站点+用户名维度），SharedPreferences 的
+  /// accounts JSON 中不再保留 token 明文。
   Future<void> _syncAccountSnapshot(Map<String, dynamic> data) async {
     final siteUrl = await SpUtils.getString('CurrentBaseUrl');
     final userName = await SpUtils.getString('currentUserName');
     if (siteUrl.isEmpty || userName.isEmpty) return;
-    final list = await SpUtils.getStringList('accounts');
-    if (list.isEmpty) return;
-    final token = {
-      'access_token': data['access_token'],
-      'refresh_token': data['refresh_token'],
-      'access_expires': data['access_expires'],
-      'refresh_expires': data['refresh_expires'],
-    };
-    final updated = <String>[];
-    for (final raw in list) {
-      try {
-        final jsonData = jsonDecode(raw) as Map<String, dynamic>;
-        if (jsonData['siteUrl'] == siteUrl &&
-            jsonData['userName'] == userName) {
-          jsonData['token'] = token;
-          updated.add(jsonEncode(jsonData));
-          continue;
-        }
-      } catch (_) {}
-      updated.add(raw);
-    }
-    await SpUtils.setStringList('accounts', updated);
+    await TokenManager.saveSnapshot(
+      siteUrl: siteUrl,
+      userName: userName,
+      token: {
+        'access_token': data['access_token'],
+        'refresh_token': data['refresh_token'],
+        'access_expires': data['access_expires'],
+        'refresh_expires': data['refresh_expires'],
+      },
+    );
   }
 
   /// 请求类
