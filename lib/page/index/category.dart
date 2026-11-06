@@ -4,10 +4,12 @@ import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/enums/FileType.dart';
 import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/model/FileListPage.dart';
 import 'package:cloudpavilion/page/index/FileSelectionMixin.dart';
 import 'package:cloudpavilion/page/preview/AudioPlayerPage.dart';
 import 'package:cloudpavilion/page/preview/PreviewPage.dart';
 import 'package:cloudpavilion/util/AudioPlayerService.dart';
+import 'package:cloudpavilion/util/ErrorText.dart';
 import '../../util/SpUtils.dart';
 
 /// 分类页：按文件类型快速筛选（图片 / 视频 / 音乐 / 文档）
@@ -246,6 +248,13 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
   // 排序
   String _orderBy = '';
   String _orderDirection = '';
+  /// 下一页游标（游标分页；空串表示已到末页）
+  String _nextToken = '';
+  /// 是否正在加载下一页（防重复触发）
+  bool _loadingMore = false;
+
+  /// 是否还有更多文件可加载
+  bool get _hasMore => _nextToken.isNotEmpty;
 
   /// 当前生效的视图
   _CatView get _currentView {
@@ -335,22 +344,58 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
           orderDirection: _orderDirection,
           useCache: useCache);
       if (!mounted) return;
+      final page = FileListPage.fromData(data);
       setState(() {
-        _items = _parseFiles(data);
+        _items = page.items;
+        _nextToken = page.nextToken;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
+      // 加载失败必须与「真的没有文件」区分开：否则用户看到空状态，
+      // 会误以为分类下确实没内容
+      if (showLoading) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(appSnack('加载失败：${errorText(e, '请下拉刷新重试')}'));
+      }
     }
   }
 
-  List<FileItemModel> _parseFiles(Map<String, dynamic> data) {
-    final files = data['files'];
-    if (files is! List) return [];
-    return files
-        .map((e) => FileItemModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+  /// 加载下一页（滚动到底部时触发）
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    _loadingMore = true;
+    try {
+      final uri = '${FileApi.myRootUri}?category=${widget.category}';
+      final data = await FileApi.listFiles(uri,
+          pageSize: 200,
+          orderBy: _orderBy,
+          orderDirection: _orderDirection,
+          nextPageToken: _nextToken,
+          useCache: false);
+      if (!mounted) return;
+      final page =
+          FileListPage.fromData(data, loadedBefore: _items.length);
+      setState(() {
+        _items = [..._items, ...page.items];
+        _nextToken = page.nextToken;
+      });
+      if (page.items.isEmpty) setState(() => _nextToken = '');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(appSnack('加载更多失败，请重试'));
+      }
+    } finally {
+      _loadingMore = false;
+    }
+  }
+
+  /// 滚动到底部时自动加载下一页
+  bool _onScroll(ScrollNotification n) {
+    if (n.metrics.extentAfter < 400) _loadMore();
+    return false;
   }
 
   Future<void> _open(FileItemModel obj) async {
@@ -443,7 +488,9 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
                     : RefreshIndicator(
                         onRefresh: () =>
                             _load(showLoading: false, useCache: false),
-                        child: CustomScrollView(
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: _onScroll,
+                          child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           slivers: [
                             SliverToBoxAdapter(
@@ -580,7 +627,23 @@ class _CategoryFilesPageState extends State<CategoryFilesPage>
                                   ),
                                 ),
                               ),
+                            // 底部加载指示：还有下一页时展示，滚动到底自动续拉
+                            if (_hasMore)
+                              const SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
+                        ),
                         ),
                       ),
           ),

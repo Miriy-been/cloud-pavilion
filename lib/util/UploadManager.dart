@@ -61,6 +61,13 @@ class UploadManager extends ChangeNotifier {
   /// 前台通知更新节流：上次更新时间
   DateTime _lastFgUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// 任务列表结构变化（上传结束：完成 / 失败 / 取消）时递增的通知。
+  ///
+  /// 供文件列表页监听以刷新目录。**进度更新不会触发它** ——
+  /// 进度回调每 250ms 就会 notifyListeners 一次，若列表页直接监听
+  /// [UploadManager] 本身，上传期间会持续以同样频率重新拉取一次目录。
+  final ValueNotifier<int> listChanged = ValueNotifier(0);
+
   /// 状态变化：立即通知并持久化
   void _notifyImmediate() {
     _lastNotify = DateTime.now();
@@ -131,6 +138,8 @@ class UploadManager extends ChangeNotifier {
     } catch (_) {
       // 本地数据损坏时忽略，保留空列表
     }
+    // 恢复出的任务可能含新完成项，令目录刷新一次
+    listChanged.value++;
   }
 
   /// 持久化全部任务记录
@@ -154,6 +163,7 @@ class UploadManager extends ChangeNotifier {
     _speed.clear();
     _sessions.clear();
     notifyListeners();
+    listChanged.value++;
     _syncForeground(force: true);
     await restore();
   }
@@ -353,6 +363,8 @@ class UploadManager extends ChangeNotifier {
       _speed.remove(task);
       _sessions.remove(task); // 上传成功时仅清引用，不删服务端会话
       _notifyImmediate();
+      // 任务已进入终态：目录内容可能已变化，通知文件列表页刷新一次
+      listChanged.value++;
     }
   }
 }

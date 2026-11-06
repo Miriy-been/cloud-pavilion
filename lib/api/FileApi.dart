@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:cloudpavilion/exception/BusinessException.dart';
 import 'package:cloudpavilion/exception/DebugReportException.dart';
 import 'package:cloudpavilion/exception/LockConflictException.dart';
@@ -84,6 +85,41 @@ class FileApi {
     } catch (_) {}
   }
 
+  /// 读取一条直链缓存：**必须校验有效期**。
+  ///
+  /// 直链 TTL 默认 1 小时，而 App 常驻后台可能远超这个时长；若只判断 key 存在，
+  /// 就会把过期 URL 交给图片/播放器/下载器，表现为裂图、403 与下载失败。
+  /// 命中过期项时立即从内存中移除（服务端仍会签发新 URL，由调用方重新请求）。
+  @visibleForTesting
+  static String? readUrlCacheForTest(String key) => _readUrlCache(key);
+
+  /// 写入直链缓存（仅供测试构造用例；只写内存，不落盘）
+  @visibleForTesting
+  static void writeUrlCacheForTest(
+      String key, String url, int expiresAtMs) {
+    _urlCache[key] = url;
+    _urlCacheExpiryAt[key] = expiresAtMs;
+  }
+
+  /// 清空直链缓存（仅供测试隔离用例）
+  @visibleForTesting
+  static void clearUrlCacheForTest() {
+    _urlCache.clear();
+    _urlCacheExpiryAt.clear();
+  }
+
+  static String? _readUrlCache(String key) {
+    final url = _urlCache[key];
+    if (url == null) return null;
+    final expiresAt = _urlCacheExpiryAt[key] ?? 0;
+    if (expiresAt <= DateTime.now().millisecondsSinceEpoch) {
+      _urlCache.remove(key);
+      _urlCacheExpiryAt.remove(key);
+      return null;
+    }
+    return url;
+  }
+
   /// 写入一条直链缓存并异步落盘（失败不影响主流程）
   static void _saveUrlCache(String key, String url, int expiresAtMs) {
     _urlCache[key] = url;
@@ -125,13 +161,20 @@ class FileApi {
   /// 返回响应中的 data（含 files/parent/pagination）
   /// [orderBy]: name/size/updated_at/created_at
   /// [useCache] 为 false 时强制刷新（下拉刷新场景），成功后同样写入缓存
+  /// [page] **从 0 开始**：服务端偏移分页按 `Offset(page * page_size)` 取数，
+  /// 传 1 会跳过首页。仅在关闭游标分页的站点生效。
+  /// [nextPageToken] 游标分页 token。Cloudreve V4 默认开启游标分页
+  /// （`use_cursor_pagination=1`），此时 `page` 参数被服务端忽略，
+  /// 翻页唯一可靠的方式是把上一页返回的 `pagination.next_token` 回传。
   static Future<Map<String, dynamic>> listFiles(String uri,
-      {int page = 1,
+      {int page = 0,
       int pageSize = 100,
       String? orderBy,
       String? orderDirection,
+      String? nextPageToken,
       bool useCache = true}) async {
-    final key = '$uri|$page|$pageSize|$orderBy|$orderDirection';
+    final key =
+        '$uri|$page|$pageSize|$orderBy|$orderDirection|$nextPageToken';
     if (useCache) {
       final cached = _listCache[key];
       if (cached != null && !cached.isExpired) return cached.data;
@@ -145,6 +188,8 @@ class FileApi {
           if (orderBy != null && orderBy.isNotEmpty) 'order_by': orderBy,
           if (orderDirection != null && orderDirection.isNotEmpty)
             'order_direction': orderDirection,
+          if (nextPageToken != null && nextPageToken.isNotEmpty)
+            'next_page_token': nextPageToken,
         });
     final data = result['data'];
     final map = data is Map
@@ -231,7 +276,7 @@ class FileApi {
   static Future<String?> getThumbnailUrl(String uri) async {
     await _loadUrlCache();
     final key = '${await _sitePrefix()}|thumb|$uri';
-    final cached = _urlCache[key];
+    final cached = _readUrlCache(key);
     if (cached != null) return cached;
 
     var result = await DioUtil().request('/api/v4/file/thumb',
@@ -283,7 +328,7 @@ class FileApi {
     // just_audio 缓存 key（sha256(url)）稳定，避免 app 重启 / 直链过期后整曲重下
     await _loadUrlCache();
     final key = '${await _sitePrefix()}|$uri|$download';
-    final cached = _urlCache[key];
+    final cached = _readUrlCache(key);
     if (cached != null) return cached;
 
     var result = await DioUtil().request('/api/v4/file/url',

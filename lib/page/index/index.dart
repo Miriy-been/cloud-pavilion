@@ -9,6 +9,7 @@ import 'package:cloudpavilion/config/AppTheme.dart';
 import 'package:cloudpavilion/config/AppWidgets.dart';
 import 'package:cloudpavilion/enums/FileType.dart';
 import 'package:cloudpavilion/model/FileItemModel.dart';
+import 'package:cloudpavilion/model/FileListPage.dart';
 import 'package:cloudpavilion/page/index/FileSelectionMixin.dart';
 import 'package:cloudpavilion/page/index/trash.dart';
 import 'package:cloudpavilion/page/index/search.dart';
@@ -49,6 +50,16 @@ class _IndexState extends State<Index>
   // 文件夹导航栈（用于面包屑与返回上级）
   final List<FileItemModel> _folderStack = [];
 
+  /// 下一页游标（游标分页；空串表示已到末页）
+  String _nextToken = '';
+  /// 列表总条数（服务端 pagination 返回值，0 表示未知）
+  int _totalItems = 0;
+  /// 是否正在加载下一页（防重复触发）
+  bool _loadingMore = false;
+
+  /// 是否还有更多文件可加载
+  bool get _hasMore => _nextToken.isNotEmpty;
+
   /// 当前生效的视图
   _View get _currentView {
     if (_isGallery) return _View.gallery;
@@ -82,8 +93,10 @@ class _IndexState extends State<Index>
     onFolderDownload = _downloadFolder;
     getRootFileList();
     _loadGridView();
-    // 上传任务状态变化（新增/完成/取消）时刷新当前目录列表
-    UploadManager.instance.addListener(_onUploadChanged);
+    // 上传任务结束（完成/失败/取消）时刷新当前目录列表。
+    // 监听 listChanged 而非 UploadManager 本身：后者在进度回调中每 250ms
+    // 通知一次，直接监听会让上传期间持续重新拉取整个目录。
+    UploadManager.instance.listChanged.addListener(_onUploadChanged);
     // 服务器端压缩/解压任务完成时刷新当前目录列表
     WorkflowTaskManager.instance.addListener(_onWorkflowTaskChanged);
   }
@@ -103,12 +116,12 @@ class _IndexState extends State<Index>
 
   @override
   void dispose() {
-    UploadManager.instance.removeListener(_onUploadChanged);
+    UploadManager.instance.listChanged.removeListener(_onUploadChanged);
     WorkflowTaskManager.instance.removeListener(_onWorkflowTaskChanged);
     super.dispose();
   }
 
-  /// 上传任务变化时刷新当前目录列表
+  /// 上传任务结束时刷新当前目录列表
   void _onUploadChanged() {
     if (mounted) _refresh();
   }
@@ -146,7 +159,9 @@ class _IndexState extends State<Index>
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refresh,
-              child: CustomScrollView(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScroll,
+                child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   if (currentList.isNotEmpty)
@@ -156,7 +171,11 @@ class _IndexState extends State<Index>
                             _folderStack.isEmpty ? 20 : 0, pagePad, 6),
                         child: SectionHeader(
                           title: '全部文件',
-                          count: '${currentList.length}',
+                          // 分页后 currentList 只是已加载部分：有总数时显示
+                          // 「已加载/总数」，让用户知道下方还可继续加载
+                          count: _totalItems > currentList.length
+                              ? '${currentList.length}/$_totalItems'
+                              : '${currentList.length}',
                           trailing: SortChip(
                             options: const [
                               SortOption('', '默认排序'),
@@ -237,7 +256,22 @@ class _IndexState extends State<Index>
                         ),
                       ),
                     ),
+                  // 底部加载指示：还有下一页时展示，滚动到底自动续拉
+                  if (_hasMore)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
+              ),
               ),
             ),
           ),
@@ -467,8 +501,11 @@ class _IndexState extends State<Index>
       final data = await FileApi.listFiles(menu,
           orderBy: _orderBy, orderDirection: _orderDirection);
       if (!mounted) return;
+      final page = FileListPage.fromData(data);
       setState(() {
-        currentList = _parseFiles(data);
+        currentList = page.items;
+        _nextToken = page.nextToken;
+        _totalItems = page.totalItems;
       });
     } catch (e) {
       _showLoadError(e);
@@ -482,9 +519,12 @@ class _IndexState extends State<Index>
       final data = await FileApi.listFiles(obj.path,
           orderBy: _orderBy, orderDirection: _orderDirection);
       if (!mounted) return;
+      final page = FileListPage.fromData(data);
       setState(() {
         _folderStack.add(obj);
-        currentList = _parseFiles(data);
+        currentList = page.items;
+        _nextToken = page.nextToken;
+        _totalItems = page.totalItems;
       });
       _saveFolderStack();
     } catch (e) {
@@ -505,8 +545,11 @@ class _IndexState extends State<Index>
             orderBy: _orderBy, orderDirection: _orderDirection)
         .then((data) {
       if (!mounted) return;
+      final page = FileListPage.fromData(data);
       setState(() {
-        currentList = _parseFiles(data);
+        currentList = page.items;
+        _nextToken = page.nextToken;
+        _totalItems = page.totalItems;
       });
     }).catchError((Object e) {
       _showLoadError(e);
@@ -557,8 +600,11 @@ class _IndexState extends State<Index>
             orderBy: _orderBy, orderDirection: _orderDirection)
         .then((data) {
       if (!mounted) return;
+      final page = FileListPage.fromData(data);
       setState(() {
-        currentList = _parseFiles(data);
+        currentList = page.items;
+        _nextToken = page.nextToken;
+        _totalItems = page.totalItems;
       });
     }).catchError((Object e) {
       _showLoadError(e);
@@ -604,11 +650,51 @@ class _IndexState extends State<Index>
           orderDirection: _orderDirection,
           useCache: false);
       if (!mounted) return;
+      final page = FileListPage.fromData(data);
       setState(() {
-        currentList = _parseFiles(data);
+        currentList = page.items;
+        _nextToken = page.nextToken;
+        _totalItems = page.totalItems;
       });
     } catch (e) {
       _showLoadError(e);
+    }
+  }
+
+  /// 加载下一页（滚动到底部时触发）
+  ///
+  /// Cloudreve V4 默认游标分页，翻页靠 [_nextToken]；末页时 [_nextToken]
+  /// 为空串，直接短路。
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    _loadingMore = true;
+    try {
+      String menu = await SpUtils.getString('currentMenu');
+      if (menu.isEmpty) menu = FileApi.myRootUri;
+      final data = await FileApi.listFiles(menu,
+          orderBy: _orderBy,
+          orderDirection: _orderDirection,
+          nextPageToken: _nextToken,
+          useCache: false);
+      if (!mounted) return;
+      final page = FileListPage.fromData(data,
+          loadedBefore: currentList.length);
+      setState(() {
+        currentList = [...currentList, ...page.items];
+        _nextToken = page.nextToken;
+        _totalItems = page.totalItems;
+      });
+      // 服务端返回空页但仍有 token：防止无限续拉，视为末页
+      if (page.items.isEmpty) {
+        setState(() => _nextToken = '');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(appSnack('加载更多失败：${errorText(e, '请重试')}'));
+      }
+    } finally {
+      _loadingMore = false;
     }
   }
 
@@ -619,12 +705,10 @@ class _IndexState extends State<Index>
         .showSnackBar(appSnack('加载失败：${errorText(e, '请下拉刷新重试')}'));
   }
 
-  List<FileItemModel> _parseFiles(Map<String, dynamic> data) {
-    final files = data['files'];
-    if (files is! List) return [];
-    return files
-        .map((e) => FileItemModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+  /// 滚动到底部时自动加载下一页
+  bool _onScroll(ScrollNotification n) {
+    if (n.metrics.extentAfter < 400) _loadMore();
+    return false;
   }
 
   /// 设置排序字段并刷新
