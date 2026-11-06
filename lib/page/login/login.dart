@@ -334,7 +334,8 @@ class _LoginState extends State<Login> {
     // 登录成功后启动 token 定时自动刷新
     TokenAutoRefresh.instance.start();
 
-    // 跳转根目录
+    // 跳转根目录（前面多个 await，页面可能已销毁）
+    if (!context.mounted) return;
     Navigator.pushReplacementNamed(context, "/");
   }
 

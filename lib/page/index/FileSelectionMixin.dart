@@ -194,12 +194,16 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
     // 单个文件取直链失败不中断：记录失败数，继续处理其余文件，最后统一提示，
     // 避免断网/DNS 失败时抛未处理异常（Unhandled Exception）
     var failed = 0;
+    // 记录首个失败原因：仅报「N 个失败」时用户无法判断是权限、网络还是
+    // 服务端拒绝，附上具体原因才能自助排查
+    String? firstError;
     for (final obj in files) {
       try {
         final url = await FileApi.getDownloadUrl(obj.path);
         DownloadManager.instance.startDownload(obj.name, url);
       } catch (e) {
         failed++;
+        firstError ??= errorText(e, '未知错误');
       }
     }
     for (final obj in dirs) {
@@ -214,12 +218,13 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
         await downloader(obj);
       } catch (e) {
         failed++;
+        firstError ??= errorText(e, '未知错误');
       }
     }
     exitSelection();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(appSnack(failed > 0
-        ? '已添加 ${files.length - failed} 个下载任务，$failed 个失败'
+        ? '已添加 ${files.length - failed} 个下载任务，$failed 个失败（$firstError）'
         : '已添加 ${files.length} 个下载任务'));
   }
 
@@ -268,6 +273,7 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
     final siteUrl = await SpUtils.getString('CurrentBaseUrl');
     final links = <String>[];
     var failed = 0;
+    String? firstError;
     for (final obj in items) {
       try {
         final path = await ShareApi.createShare(
@@ -280,6 +286,7 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
         links.add(ShareApi.buildFullUrl(siteUrl, path));
       } catch (e) {
         failed++;
+        firstError ??= errorText(e, '未知错误');
       }
     }
     exitSelection();
@@ -287,18 +294,19 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
       await Clipboard.setData(ClipboardData(text: links.first));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(appSnack(failed > 0
-          ? '已创建 ${links.length} 个分享，$failed 个失败，第一个链接已复制'
+          ? '已创建 ${links.length} 个分享，$failed 个失败（$firstError），第一个链接已复制'
           : '已创建 ${links.length} 个分享，第一个链接已复制'));
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(appSnack('创建分享失败'));
+          .showSnackBar(appSnack('创建分享失败：${firstError ?? '未知错误'}'));
     }
   }
 
   /// 批量移动 / 复制
   Future<void> batchMove(List<FileItemModel> items) async {
     final dir = await SpUtils.getString('currentMenu');
+    if (!mounted) return;
     final result = await FolderPicker.pick(
       context,
       startUri: dir.isEmpty ? FileApi.myRootUri : dir,

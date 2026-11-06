@@ -565,6 +565,7 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
         .invokeMethod<Map<dynamic, dynamic>>('ensureAppDownloadDir');
     if (res != null && res['ok'] == true) return true;
     if (res == null || res['needPermission'] != true) return true;
+    if (!mounted) return false;
     final go = await showAppConfirm(
       context: context,
       title: '需要权限',
@@ -605,7 +606,8 @@ class _AccountState extends State<Account> with AutomaticKeepAliveClientMixin {
     TokenManager.clear();
     SpUtils.setBool("isLogin", false);
     AuthState.isLoggedIn.value = false;
-    // 跳转路由
+    // 跳转路由（登出流程含多个 await，页面可能已销毁）
+    if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
         context, "/home", (route) => false);
   }

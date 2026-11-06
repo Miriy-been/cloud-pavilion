@@ -356,6 +356,7 @@ class _UsersState extends State<Users> {
     await WorkflowTaskManager.instance.switchAccount();
     // 切换账号后启动 token 定时自动刷新
     TokenAutoRefresh.instance.start();
+    if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, "/", (route) => false);
   }
 }

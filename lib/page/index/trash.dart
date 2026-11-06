@@ -109,6 +109,7 @@ class _TrashPageState extends State<TrashPage> {
     final confirmed = await _confirm('彻底删除',
         '确定永久删除「${obj.name}」吗？此操作不可恢复');
     if (confirmed != true) return;
+    if (!mounted) return;
     final ok = await deleteWithUnlock(context, [obj.path], skipSoftDelete: true);
     if (!ok || !mounted) return;
     _load(showLoading: false, useCache: false);
@@ -123,6 +124,7 @@ class _TrashPageState extends State<TrashPage> {
     final confirmed = await _confirm('清空回收站',
         '确定永久删除回收站中的全部 ${_items.length} 项吗？此操作不可恢复');
     if (confirmed != true) return;
+    if (!mounted) return;
     final ok = await deleteWithUnlock(
         context, _items.map((e) => e.path).toList(),
         skipSoftDelete: true);

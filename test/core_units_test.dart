@@ -4,6 +4,7 @@ import 'package:cloudpavilion/api/FileApi.dart';
 import 'package:cloudpavilion/model/DownloadTaskModel.dart';
 import 'package:cloudpavilion/model/FileListPage.dart';
 import 'package:cloudpavilion/model/UploadTaskModel.dart';
+import 'package:cloudpavilion/util/AppCache.dart';
 import 'package:cloudpavilion/util/ErrorText.dart';
 
 /// 核心纯逻辑单元测试：任务模型序列化容错 + 失败提示中文化。
@@ -195,4 +196,25 @@ void main() {
     });
   });
 
+  group('AppCache 活跃文件隔离', () {
+    test('登记后同一路径被识别为活跃（含分隔符归一）', () {
+      AppCache.markActive(r'C:\tmp\a.bin');
+      expect(AppCache.isActiveForTest(r'C:\tmp\a.bin'), isTrue);
+      // Windows 反斜杠与正斜杠应视为同一文件
+      expect(AppCache.isActiveForTest('C:/tmp/a.bin'), isTrue);
+      AppCache.unmarkActive(r'C:\tmp\a.bin');
+    });
+
+    test('注销后不再视为活跃（下载结束可被正常清理）', () {
+      AppCache.markActive('/tmp/b.bin');
+      AppCache.unmarkActive('/tmp/b.bin');
+      expect(AppCache.isActiveForTest('/tmp/b.bin'), isFalse);
+    });
+
+    test('不同路径互不影响', () {
+      AppCache.markActive('/tmp/c.bin');
+      expect(AppCache.isActiveForTest('/tmp/d.bin'), isFalse);
+      AppCache.unmarkActive('/tmp/c.bin');
+    });
+  });
 }

@@ -1,15 +1,29 @@
 import 'package:dio/dio.dart';
+import 'package:cloudpavilion/exception/BusinessException.dart';
 
-/// 将异常转为简短的中文错误文本，用于上传 / 下载失败时的即时提示
+/// 将异常转为简短的中文错误文本，用于上传 / 下载失败与全局异常提示。
+///
+/// 这是**全应用唯一的错误文案出口**：全局 [AppExceptionHandle] 与各页面
+/// 的局部提示都走这里，避免两套映射表（如服务端英文措辞只在一处被中文化）。
 String errorText(Object e, String fallback) {
+  if (e is BusinessException) {
+    // 非 0 业务码：服务端 msg 优先，缺失时用 code 兜底
+    final m = e.message?.trim() ?? '';
+    return m.isEmpty ? '请求失败 (code: ${e.code})' : _localizeServerMsg(m);
+  }
   if (e is DioException) {
     final resp = e.response;
     if (resp != null) {
+      // 业务码 401 由拦截器转成 DioException 抛出，提示语面向用户更准确
       final body = resp.data;
+      if (body is Map && body['code'] == 401) return '登录已过期，请重新登录';
       if (body is Map &&
           body['msg'] != null &&
           body['msg'].toString().isNotEmpty) {
         return _localizeServerMsg(body['msg'].toString());
+      }
+      if (body is String && body.isNotEmpty) {
+        return _localizeServerMsg(body);
       }
       return '请求失败 (${resp.statusCode})';
     }

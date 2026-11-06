@@ -8,6 +8,7 @@ import 'package:cloudpavilion/model/DownloadTaskModel.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'ErrorText.dart';
+import 'AppCache.dart';
 import 'SpUtils.dart';
 import 'DownloadForegroundService.dart';
 
@@ -279,6 +280,8 @@ class DownloadManager extends ChangeNotifier {
       _notifyImmediate();
       return;
     }
+    // 登记为「正在写入」：清理缓存时跳过该文件，避免下载中途被删
+    AppCache.markActive(workingPath);
     try {
       await _dio.download(
         task.sourceUrl,
@@ -319,6 +322,7 @@ class DownloadManager extends ChangeNotifier {
       }
       _notifyImmediate();
     } finally {
+      AppCache.unmarkActive(workingPath);
       _tokens.remove(task);
       _speed.remove(task);
     }

@@ -1063,6 +1063,7 @@ class _IndexState extends State<Index>
         '解压', '确定将选中的 ${archives.length} 个压缩包解压到所选目录吗？');
     if (confirmed != true) return;
     final dir = await SpUtils.getString('currentMenu');
+    if (!mounted) return;
     // 选择解压目标目录（默认当前目录）
     final pick = await FolderPicker.pick(
       context,
@@ -1131,6 +1132,7 @@ class _IndexState extends State<Index>
     try {
       final task = await WorkflowApi.createArchive([obj.path], zipUri);
       final taskId = task['id']?.toString() ?? '';
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(appSnack('已创建打包任务，完成后将自动开始下载'));
       if (taskId.isNotEmpty) {
@@ -1158,6 +1160,7 @@ class _IndexState extends State<Index>
   /// 压缩为 ZIP（单个或批量，可选输出目录）
   Future<void> onCompress(List<FileItemModel> items) async {
     final dir = await SpUtils.getString('currentMenu');
+    if (!mounted) return;
     final pick = await FolderPicker.pick(
       context,
       startUri: dir.isEmpty ? FileApi.myRootUri : dir,
@@ -1227,6 +1230,7 @@ class _IndexState extends State<Index>
       );
       added++;
     }
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(appSnack('已添加 $added 个上传任务，可在「传输」页查看进度'));
   }
@@ -1257,6 +1261,7 @@ class _IndexState extends State<Index>
   Future<void> _offlineDownload() async {
     final dir = await SpUtils.getString('currentMenu');
     if (dir.isEmpty) return;
+    if (!mounted) return;
     final created = await showCreateRemoteDownloadDialog(
       context,
       startUri: dir,
