@@ -200,7 +200,7 @@ mixin FileSelectionMixin<T extends StatefulWidget> on State<T> {
     for (final obj in files) {
       try {
         final url = await FileApi.getDownloadUrl(obj.path);
-        DownloadManager.instance.startDownload(obj.name, url);
+        DownloadManager.instance.startDownload(obj.name, url, sourceUri: obj.path);
       } catch (e) {
         failed++;
         firstError ??= errorText(e, '未知错误');

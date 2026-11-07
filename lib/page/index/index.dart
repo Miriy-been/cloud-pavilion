@@ -1145,7 +1145,7 @@ class _IndexState extends State<Index>
         }
       }
       final url = await FileApi.getDownloadUrl(zipUri);
-      DownloadManager.instance.startDownload('${obj.name}.zip', url);
+      DownloadManager.instance.startDownload('${obj.name}.zip', url, sourceUri: zipUri);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(appSnack('开始下载 ${obj.name}.zip'));

@@ -191,6 +191,124 @@ class SheetHandle extends StatelessWidget {
   }
 }
 
+/// 按云端 URI 展示缩略图的文件瓦片（任务列表用）
+///
+/// 与 [GridThumb] 的区别：后者依赖 [FileItemModel]，而上传 / 下载任务只有
+/// 文件名与云端 URI。取不到缩略图（非图片类 / 无缩略图 / 网络失败）时
+/// 回退为类型图标 [FileTile]，保证列表始终有占位。
+///
+/// [available] 为 false 时**不发起任何请求**，直接显示类型图标。
+/// 上传未完成时服务端只有占位文件（内容为空），此时取缩略图可能拿到
+/// 空图并写入 1 小时有效的直链缓存，导致上传完成后缩略图仍是错的
+/// （缓存污染）。因此由调用方在上传完成后才置为 true。
+class UriThumb extends StatefulWidget {
+  final String uri;
+  final String name;
+  final double size;
+  final double? borderRadius;
+
+  /// 文件是否已就绪（上传完成）。false 时只显示图标，不发请求。
+  final bool available;
+
+  const UriThumb({
+    super.key,
+    required this.uri,
+    required this.name,
+    this.size = 44,
+    this.borderRadius,
+    this.available = true,
+  });
+
+  @override
+  State<UriThumb> createState() => _UriThumbState();
+}
+
+class _UriThumbState extends State<UriThumb> {
+  /// 会话级缓存：列表滚动反复重建时避免重复请求
+  static final Map<String, String> _cache = {};
+  static final Map<String, Future<String?>> _inflight = {};
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeLoad();
+  }
+
+  @override
+  void didUpdateWidget(covariant UriThumb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // URI 变化，或文件刚从未就绪变为就绪（如上传完成）时才（重新）加载
+    if (oldWidget.uri != widget.uri ||
+        (!oldWidget.available && widget.available)) {
+      _maybeLoad();
+    }
+  }
+
+  void _maybeLoad() {
+    // 文件尚未就绪（上传中）：服务端只有空占位，取到的缩略图不可信，
+    // 且会污染直链缓存，因此完全不发请求
+    if (!widget.available) return;
+    // 只有可能带缩略图的类型才发请求（文档类通常没有封面，避免无谓请求）
+    final name = widget.name;
+    if (widget.uri.isEmpty) return;
+    if (!(FileType.isImage(0, name) ||
+        FileType.isVideo(0, name) ||
+        FileType.isAudio(0, name))) {
+      return;
+    }
+    _load();
+  }
+
+  Future<void> _load() async {
+    final uri = widget.uri;
+    final cached = _cache[uri];
+    if (cached != null) {
+      if (mounted && cached.isNotEmpty) setState(() => _url = cached);
+      return;
+    }
+    final future = _inflight.putIfAbsent(
+      uri,
+      () => FileApi.getThumbnailUrl(uri).then((u) {
+        _inflight.remove(uri);
+        if (u != null && u.isNotEmpty) _cache[uri] = u;
+        return u;
+      }).catchError((_) {
+        _inflight.remove(uri);
+        return null;
+      }),
+    );
+    final url = await future;
+    if (mounted && url != null && url.isNotEmpty) {
+      setState(() => _url = url);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = widget.borderRadius ?? widget.size * 0.27;
+    final fallback = FileTile(
+      type: 0,
+      name: widget.name,
+      size: widget.size,
+      borderRadius: widget.borderRadius,
+    );
+    final url = _url;
+    if (url == null || url.isEmpty) return fallback;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: CachedImage(
+        url: url,
+        width: widget.size,
+        height: widget.size,
+        fit: BoxFit.cover,
+        placeholder: fallback,
+        errorBuilder: (_, __) => fallback,
+      ),
+    );
+  }
+}
+
 /// 圆角文件图标瓦片
 class FileTile extends StatelessWidget {
   final int type; // 0=文件 1=文件夹

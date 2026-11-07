@@ -120,10 +120,21 @@ class DownloadManager extends ChangeNotifier {
       final list = jsonDecode(raw) as List<dynamic>;
       for (final e in list) {
         final t = DownloadTaskModel.fromJson(e as Map<String, dynamic>);
-        // 重启后未完成任务无法续传，标记为中断失败
         if (t.status == DownloadStatus.downloading) {
+          // 重启后下载已中断：部分文件若仍在，保留断点供手动「继续」
           t.status = DownloadStatus.failed;
-          t.error = '下载已中断';
+          final partial = File(t.savePath);
+          final exists = t.savePath.isNotEmpty && partial.existsSync();
+          if (exists && partial.lengthSync() > 0) {
+            t.downloaded = partial.lengthSync();
+            if (t.totalSize > 0) {
+              t.progress = t.downloaded / t.totalSize;
+            }
+            final mb = (t.downloaded / 1024 / 1024).toStringAsFixed(1);
+            t.error = '下载中断（已下载 $mb MB，可继续）';
+          } else {
+            t.error = '下载已中断';
+          }
         }
         tasks.add(t);
       }
@@ -131,25 +142,35 @@ class DownloadManager extends ChangeNotifier {
     } catch (_) {
       // 本地数据损坏时忽略，保留空列表
     }
-    // 启动时清理中断 / 残留的下载临时文件（重启后无进行中的下载）
+    // 清理无主临时文件：仅删除没有对应任务的残留，
+    // 有任务在跟踪的文件必须保留，否则断点续传失效。
     await _clearTempLeftovers();
   }
 
-  /// 清理下载临时目录（files/CloudReve/.tmp）中的残留文件：
-  /// 取消 / 中断的下载会留下半成品，若不清理将持续占用 app 数据空间
+  /// 清理下载临时目录（files/CloudReve/.tmp）中的**无主**残留文件。
+  ///
+  /// 有任务在跟踪的部分文件必须保留，否则断点续传失效：
+  /// 只删除那些路径没有出现在任何任务 savePath 中的文件。
   Future<void> _clearTempLeftovers() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final folder = Directory('${dir.path}${Platform.pathSeparator}CloudReve'
           '${Platform.pathSeparator}.tmp');
       if (!await folder.exists()) return;
+      // 所有任务仍在使用的路径（含已完成，避免误删尚未转存的文件）
+      final inUse = tasks.map((t) => _norm(t.savePath)).toSet();
       await for (final e in folder.list()) {
+        if (e is! File) continue;
+        if (inUse.contains(_norm(e.path))) continue;
         try {
           await e.delete();
         } catch (_) {}
       }
     } catch (_) {}
   }
+
+  /// 路径归一（Windows 反斜杠与 Android 正斜杠统一比较）
+  String _norm(String p) => p.replaceAll('\\', '/');
 
   /// 持久化全部任务记录
   Future<void> _persist() async {
@@ -163,7 +184,7 @@ class DownloadManager extends ChangeNotifier {
   Future<void> switchAccount() async {
     for (final t in List.of(tasks)) {
       if (t.status == DownloadStatus.downloading) {
-        t.status = DownloadStatus.cancelled;
+        t.status = DownloadStatus.paused;
         _tokens.remove(t)?.cancel();
       }
     }
@@ -207,13 +228,18 @@ class DownloadManager extends ChangeNotifier {
   }
 
   /// 开始下载（url 为签名临时直链，无需认证头）
-  Future<void> startDownload(String name, String url) async {
+  ///
+  /// [sourceUri] 为该文件在云端的 URI（cloudreve://...），仅用于展示缩略图；
+  /// 缺失时列表回退为类型图标。
+  Future<void> startDownload(String name, String url,
+      {String sourceUri = ''}) async {
     final systemDownloads =
         await SpUtils.getString('downloadDirMode', 'system') == 'system';
     final task = DownloadTaskModel(
       name: name,
       savePath: '',
       sourceUrl: url,
+      sourceUri: sourceUri,
       systemDownloads: systemDownloads,
     );
     tasks.add(task);
@@ -221,38 +247,69 @@ class DownloadManager extends ChangeNotifier {
     await _runDownload(task, systemDownloads: systemDownloads);
   }
 
-  /// 取消下载任务
+  /// 暂停下载
+  ///
+  /// 保留已下载的部分文件，之后点「继续」可断点续传。
+  /// 若不再需要该任务，用 [remove] 彻底删除并清理临时文件。
   void cancel(DownloadTaskModel task) {
     if (task.status != DownloadStatus.downloading) return;
-    task.status = DownloadStatus.cancelled;
+    task.status = DownloadStatus.paused;
     _tokens.remove(task)?.cancel();
-    // 取消系统下载目录模式的任务：删除临时文件，避免残留占用 app 数据空间
-    // （app 专属目录模式直接写入 /storage/emulated/0/cloudreve，属于用户资产不删）
-    if (task.systemDownloads && task.savePath.isNotEmpty) {
+    _notifyImmediate();
+  }
+
+  /// 从列表彻底移除任务（用户放弃续传时调用）
+  ///
+  /// 未完成的临时文件一并清理，避免残留占用空间。
+  Future<void> remove(DownloadTaskModel task) async {
+    _tokens.remove(task)?.cancel();
+    _speed.remove(task);
+    tasks.remove(task);
+    // 仅清理未完成的临时文件；已完成的下载属于用户资产，不删除
+    if (task.status != DownloadStatus.finished && task.savePath.isNotEmpty) {
       try {
-        final tmp = File(task.savePath);
-        if (tmp.existsSync()) tmp.deleteSync();
+        final f = File(task.savePath);
+        if (f.existsSync()) f.deleteSync();
       } catch (_) {}
     }
     _notifyImmediate();
   }
 
-  /// 重试（失败 / 已取消的任务）
+  /// 继续（失败 / 已暂停的任务）
+  ///
+  /// 已落盘的部分文件若仍存在，用 Range 从断点续传；否则从头下载。
   Future<void> retry(DownloadTaskModel task) async {
     if (task.sourceUrl.isEmpty) return;
     task.status = DownloadStatus.downloading;
     task.error = null;
-    task.progress = 0;
-    // 重置进度状态，避免重试时残留上次的已下载字节 / 速度显示
-    task.downloaded = 0;
-    task.totalSize = 0;
     task.speed = 0;
+    // 判断能否续传：部分文件仍存在且已有落盘字节
+    final partial = File(task.savePath);
+    final exists = task.savePath.isNotEmpty && partial.existsSync();
+    var resumeFrom = 0;
+    if (exists) {
+      final onDisk = partial.lengthSync();
+      if (onDisk > 0) {
+        resumeFrom = onDisk;
+        task.downloaded = onDisk;
+        if (task.totalSize > 0) {
+          task.progress = onDisk / task.totalSize;
+        }
+      }
+    }
+    if (resumeFrom == 0) {
+      // 文件不存在或被清空：从头开始
+      task.downloaded = 0;
+      task.progress = 0;
+      task.totalSize = 0;
+    }
     _notifyImmediate();
-    await _runDownload(task, systemDownloads: task.systemDownloads);
+    await _runDownload(task,
+        systemDownloads: task.systemDownloads, resumeFrom: resumeFrom);
   }
 
   Future<void> _runDownload(DownloadTaskModel task,
-      {bool systemDownloads = false}) async {
+      {bool systemDownloads = false, int resumeFrom = 0}) async {
     final token = CancelToken();
     _tokens[task] = token;
     // 解析保存路径：系统下载目录 → 临时目录；应用专属目录 → /storage/emulated/0/cloudreve
@@ -283,17 +340,27 @@ class DownloadManager extends ChangeNotifier {
     // 登记为「正在写入」：清理缓存时跳过该文件，避免下载中途被删
     AppCache.markActive(workingPath);
     try {
-      await _dio.download(
-        task.sourceUrl,
-        workingPath,
-        cancelToken: token,
-        onReceiveProgress: (received, total) {
-          task.totalSize = total;
-          task.progress = total > 0 ? received / total : 0;
-          _updateProgress(task, received);
-          _notifyThrottled();
-        },
-      );
+      // 断点续传：已有部分文件时用 Range 请求剩余字节，并以追加方式写入。
+      // dio.download 只能整个文件覆盖写，无法追加，因此续传必须走手工流式写入。
+      final canRange = resumeFrom > 0 && File(workingPath).existsSync();
+      if (canRange) {
+        await _downloadWithRange(task, workingPath, resumeFrom, token);
+      } else {
+        await _dio.download(
+          task.sourceUrl,
+          workingPath,
+          cancelToken: token,
+          // 必须显式关闭：dio 默认 true，会在失败/取消时删除已下载的部分文件，
+          // 导致「继续」时无文件可续、只能从头下载。
+          deleteOnError: false,
+          onReceiveProgress: (received, total) {
+            task.totalSize = total;
+            task.progress = total > 0 ? received / total : 0;
+            _updateProgress(task, received);
+            _notifyThrottled();
+          },
+        );
+      }
       task.progress = 1;
       task.downloaded = task.totalSize;
       task.speed = 0;
@@ -304,7 +371,7 @@ class DownloadManager extends ChangeNotifier {
       _notifyImmediate();
     } on DioException catch (e) {
       if (CancelToken.isCancel(e)) {
-        task.status = DownloadStatus.cancelled;
+        task.status = DownloadStatus.paused;
       } else {
         task.status = DownloadStatus.failed;
         task.error = errorText(e, '网络错误');
@@ -325,6 +392,71 @@ class DownloadManager extends ChangeNotifier {
       AppCache.unmarkActive(workingPath);
       _tokens.remove(task);
       _speed.remove(task);
+    }
+  }
+
+  /// 从指定字节偏移继续下载（Range 续传）。
+  ///
+  /// dio 的 `download` 只能整文件覆盖写，无法追加；这里手工发起请求并把
+  /// 响应流追加到已存在的部分文件末尾。
+  Future<void> _downloadWithRange(DownloadTaskModel task, String path,
+      int resumeFrom, CancelToken token) async {
+    final response = await _dio.get<ResponseBody>(
+      task.sourceUrl,
+      cancelToken: token,
+      options: Options(
+        headers: {'Range': 'bytes=$resumeFrom-'},
+        responseType: ResponseType.stream,
+      ),
+    );
+
+    final status = response.statusCode ?? 0;
+    // 206 = 部分内容，符合续传预期
+    if (status != 206) {
+      // 服务端不支持 Range（或直链已变更）：退回整体重下
+      final total = int.tryParse(
+              response.headers.value(Headers.contentLengthHeader) ?? '') ??
+          0;
+      await _dio.download(
+        task.sourceUrl,
+        path,
+        cancelToken: token,
+        onReceiveProgress: (received, t) {
+          task.totalSize = t;
+          task.progress = t > 0 ? received / t : 0;
+          _updateProgress(task, received);
+          _notifyThrottled();
+        },
+      );
+      if (total == 0) {
+        task.totalSize = File(path).lengthSync();
+      }
+      return;
+    }
+
+    // 从 Content-Range 解析完整文件大小，用于进度换算
+    final cr = response.headers.value('content-range') ?? '';
+    var totalSize = task.totalSize;
+    final m = RegExp(r'/\s*(\d+)').firstMatch(cr);
+    if (m != null) {
+      totalSize = int.tryParse(m.group(1) ?? '') ?? totalSize;
+    }
+    task.totalSize = totalSize;
+
+    final raf = await File(path).open(mode: FileMode.append);
+    var received = resumeFrom;
+    try {
+      await for (final chunk in response.data!.stream) {
+        raf.writeFromSync(chunk);
+        received += chunk.length;
+        task.downloaded = received;
+        task.progress = totalSize > 0 ? received / totalSize : 0;
+        _updateProgress(task, received);
+        _notifyThrottled();
+      }
+      await raf.flush();
+    } finally {
+      await raf.close();
     }
   }
 

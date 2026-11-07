@@ -43,6 +43,316 @@ void main() {
     });
   });
 
+  group('UploadTaskModel 断点续传上下文', () {
+    test('会话未过期时可续传', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..sessionId = 'sess-1'
+        ..sessionExpiresAt =
+            DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch
+        ..chunkSize = 10
+        ..uploadedChunks = [0, 1];
+      expect(t.canResume, isTrue);
+    });
+
+    test('会话已过期时不可续传', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..sessionId = 'sess-1'
+        ..sessionExpiresAt =
+            DateTime.now().subtract(const Duration(hours: 1)).millisecondsSinceEpoch;
+      expect(t.canResume, isFalse);
+    });
+
+    test('无 sessionId 时不可续传', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )..sessionExpiresAt = DateTime.now()
+              .add(const Duration(hours: 1))
+              .millisecondsSinceEpoch;
+      expect(t.canResume, isFalse);
+    });
+
+    test('过期边缘（剩余不足 30 秒）视为不可续传', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..sessionId = 'sess-1'
+        ..sessionExpiresAt =
+            DateTime.now().add(const Duration(seconds: 10)).millisecondsSinceEpoch;
+      expect(t.canResume, isFalse);
+    });
+
+    test('续传上下文可序列化往返（重启后仍能续传）', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..sessionId = 'sess-9'
+        ..sessionExpiresAt =
+            DateTime.now().add(const Duration(hours: 2)).millisecondsSinceEpoch
+        ..chunkSize = 25
+        ..uploadedChunks = [0, 2];
+      final restored = UploadTaskModel.fromJson(t.toJson());
+      expect(restored.sessionId, 'sess-9');
+      expect(restored.chunkSize, 25);
+      expect(restored.uploadedChunks, [0, 2]);
+      expect(restored.canResume, isTrue);
+    });
+
+    test('clearResumeContext 清空全部续传字段', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..sessionId = 'sess-1'
+        ..sessionExpiresAt = 1
+        ..chunkSize = 10
+        ..uploadedChunks = [0];
+      t.clearResumeContext();
+      expect(t.sessionId, isNull);
+      expect(t.sessionExpiresAt, isNull);
+      expect(t.uploadedChunks, isEmpty);
+      expect(t.chunkSize, 0);
+      expect(t.canResume, isFalse);
+    });
+
+    test('旧版本任务（无续传字段）可正常加载', () {
+      final old = UploadTaskModel.fromJson({
+        'name': 'old.bin',
+        'uri': 'cloudreve://my/old.bin',
+        'sourcePath': '/tmp/old.bin',
+        'size': 10,
+        'status': 'failed',
+        'error': '上传已中断',
+      });
+      expect(old.sessionId, isNull);
+      expect(old.uploadedChunks, isEmpty);
+      expect(old.canResume, isFalse);
+    });
+  });
+
+  group('DownloadTaskModel 断点续传判定', () {
+    test('有直链 + 保存路径 + 已下载字节时可续传', () {
+      final t = DownloadTaskModel(
+        name: 'a.bin',
+        savePath: '/tmp/a.bin',
+        sourceUrl: 'https://x/a.bin',
+      )..downloaded = 1024;
+      expect(t.canResume, isTrue);
+    });
+
+    test('未下载任何字节时不可续传', () {
+      final t = DownloadTaskModel(
+        name: 'a.bin',
+        savePath: '/tmp/a.bin',
+        sourceUrl: 'https://x/a.bin',
+      );
+      expect(t.canResume, isFalse);
+    });
+
+    test('缺直链或保存路径时不可续传', () {
+      final noUrl = DownloadTaskModel(
+        name: 'a.bin',
+        savePath: '/tmp/a.bin',
+      )..downloaded = 10;
+      expect(noUrl.canResume, isFalse);
+
+      final noPath = DownloadTaskModel(
+        name: 'a.bin',
+        savePath: '',
+        sourceUrl: 'https://x/a.bin',
+      )..downloaded = 10;
+      expect(noPath.canResume, isFalse);
+    });
+
+    test('downloaded 参与序列化往返（重启后可续传）', () {
+      final t = DownloadTaskModel(
+        name: 'a.bin',
+        savePath: '/tmp/a.bin',
+        sourceUrl: 'https://x/a.bin',
+      )
+        ..downloaded = 2048
+        ..totalSize = 4096
+        ..progress = 0.5;
+      final r = DownloadTaskModel.fromJson(t.toJson());
+      expect(r.downloaded, 2048);
+      expect(r.canResume, isTrue);
+    });
+
+    test('sourceUri 参与序列化往返（重启后仍能显示缩略图）', () {
+      final t = DownloadTaskModel(
+        name: 'a.jpg',
+        savePath: '/tmp/a.jpg',
+        sourceUrl: 'https://x/a.jpg',
+        sourceUri: 'cloudreve://my/a.jpg',
+      );
+      final r = DownloadTaskModel.fromJson(t.toJson());
+      expect(r.sourceUri, 'cloudreve://my/a.jpg');
+    });
+
+    test('旧任务缺 sourceUri 时回落为空串（列表显示类型图标）', () {
+      final r = DownloadTaskModel.fromJson({
+        'name': 'old.bin',
+        'savePath': '/tmp/old.bin',
+      });
+      expect(r.sourceUri, '');
+    });
+  });
+
+  group('任务状态：暂停语义', () {
+    test('上传暂停态可序列化并往返', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )..status = UploadStatus.paused;
+      final r = UploadTaskModel.fromJson(t.toJson());
+      expect(r.status, UploadStatus.paused);
+    });
+
+    test('下载暂停态可序列化并往返', () {
+      final t = DownloadTaskModel(
+        name: 'a.bin',
+        savePath: '/tmp/a.bin',
+      )..status = DownloadStatus.paused;
+      final r = DownloadTaskModel.fromJson(t.toJson());
+      expect(r.status, DownloadStatus.paused);
+    });
+
+    test('旧版 "cancelled" 数据回落为 failed（不做兼容映射）', () {
+      final old = UploadTaskModel.fromJson({
+        'name': 'old.bin',
+        'status': 'cancelled',
+      });
+      expect(old.status, UploadStatus.failed);
+    });
+
+    test('暂停态不属于完成态，仍可继续', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..status = UploadStatus.paused
+        ..sessionId = 's'
+        ..sessionExpiresAt = DateTime.now()
+            .add(const Duration(hours: 1))
+            .millisecondsSinceEpoch
+        ..chunkSize = 10
+        ..uploadedChunks = [0]
+        ..currentChunkSent = 5;
+      expect(t.status, isNot(UploadStatus.finished));
+      expect(t.canResume, isTrue);
+      expect(t.resumeDisplayedBytes, 15);
+    });
+
+    test('暂停时展示的已传字节取分片累计', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )
+        ..status = UploadStatus.paused
+        ..chunkSize = 20
+        ..uploadedChunks = [0, 1]
+        ..currentChunkSent = 5;
+      // 20 + 20 + 5
+      expect(t.transferredBytes, 45);
+    });
+
+    test('无分片记账时回落到实时上报字节', () {
+      final t = UploadTaskModel(
+        name: 'a.bin',
+        uri: 'cloudreve://my/a.bin',
+        sourcePath: '/tmp/a.bin',
+        size: 100,
+      )..uploaded = 33;
+      // chunkSize 为 0（不分片）时按 uploaded 展示
+      expect(t.transferredBytes, 33);
+    });
+  });
+
+  group('UploadTaskModel 片内进度', () {
+    UploadTaskModel make() => UploadTaskModel(
+          name: 'a.bin',
+          uri: 'cloudreve://my/a.bin',
+          sourcePath: '/tmp/a.bin',
+          size: 100,
+        )
+          ..sessionId = 's'
+          ..sessionExpiresAt = DateTime.now()
+              .add(const Duration(hours: 1))
+              .millisecondsSinceEpoch
+          ..chunkSize = 30;
+
+    test('已完成分片字节按片大小累计（含末片截断）', () {
+      final t = make()..uploadedChunks = [0, 1];
+      expect(t.completedChunksBytes, 60);
+    });
+
+    test('末片不足一个 chunk 时只计入实际长度', () {
+      // size=100, chunk=30 → 分片 0..3，末片为 10 字节
+      final t = make()..uploadedChunks = [0, 1, 2, 3];
+      expect(t.completedChunksBytes, 100);
+    });
+
+    test('续传展示字节 = 已完成分片 + 本片已发', () {
+      final t = make()
+        ..uploadedChunks = [0]
+        ..currentChunkSent = 15;
+      expect(t.resumeDisplayedBytes, 45);
+    });
+
+    test('一片都没完成但本片有进度时，展示字节仍大于 0', () {
+      // 这正是大分片（25MB）断网的场景：不能因为片未完成就判定无进展
+      final t = make()
+        ..uploadedChunks = []
+        ..currentChunkSent = 17;
+      expect(t.resumeDisplayedBytes, 17);
+      expect(t.canResume, isTrue);
+    });
+
+    test('展示字节不会超过文件大小', () {
+      final t = make()
+        ..uploadedChunks = [0, 1, 2]
+        ..currentChunkSent = 999;
+      expect(t.resumeDisplayedBytes, 100);
+    });
+
+    test('currentChunkSent 参与序列化往返', () {
+      final t = make()..currentChunkSent = 12;
+      expect(UploadTaskModel.fromJson(t.toJson()).currentChunkSent, 12);
+    });
+
+    test('clearResumeContext 同时清零片内进度', () {
+      final t = make()..currentChunkSent = 12;
+      t.clearResumeContext();
+      expect(t.currentChunkSent, 0);
+    });
+  });
+
   group('UploadTaskModel 序列化', () {
     test('toJson → fromJson 往返保持字段一致', () {
       final t = UploadTaskModel(

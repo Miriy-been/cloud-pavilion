@@ -167,7 +167,7 @@ class _PreviewPageState extends State<PreviewPage> {
   Future<void> _downloadCurrent() async {
     try {
       final url = await FileApi.getDownloadUrl(_current.path);
-      DownloadManager.instance.startDownload(_current.name, url);
+      DownloadManager.instance.startDownload(_current.name, url, sourceUri: _current.path);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(appSnack('开始下载 ${_current.name}'));

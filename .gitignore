@@ -6,6 +6,7 @@
 .packages
 build/
 cloudreve源码/
+AI-Knowledge-Hub/
 docs/
 design/
 # Kotlin 编译错误日志

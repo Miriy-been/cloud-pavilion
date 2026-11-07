@@ -346,7 +346,11 @@ class _DownloadRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          FileTile(type: 0, name: task.name, size: 44),
+          UriThumb(
+            uri: task.sourceUri,
+            name: task.name,
+            size: 44,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -396,12 +400,17 @@ class _DownloadRow extends StatelessWidget {
                   Text(
                     ok
                         ? task.savePath
-                        : task.status == DownloadStatus.cancelled
-                            ? '已取消'
+                        : task.status == DownloadStatus.paused
+                            ? _pausedLabel(
+                                task.downloaded, task.totalSize)
                             : '下载失败：${task.error ?? '未知错误'}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: ok ? AppColors.ink3 : AppColors.danger,
+                      // 暂停不是错误：用中性灰，只有真正失败才用红色
+                      color: ok ||
+                              task.status == DownloadStatus.paused
+                          ? AppColors.ink3
+                          : AppColors.danger,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -422,8 +431,10 @@ class _DownloadRow extends StatelessWidget {
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-                const SizedBox(width: 6),
-                _CancelButton(
+                const SizedBox(width: 8),
+                _TaskActionButton(
+                  icon: Icons.pause,
+                  label: '暂停',
                   onTap: () => DownloadManager.instance.cancel(task),
                 ),
               ],
@@ -431,8 +442,22 @@ class _DownloadRow extends StatelessWidget {
           else if (ok)
             const Icon(Icons.check_circle, size: 22, color: AppColors.success)
           else
-            _RetryButton(
-              onTap: () => DownloadManager.instance.retry(task),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _TaskActionButton(
+                  icon: Icons.play_arrow,
+                  label: '继续',
+                  primary: true,
+                  onTap: () => DownloadManager.instance.retry(task),
+                ),
+                const SizedBox(width: 6),
+                _TaskActionButton(
+                  icon: Icons.delete_outline,
+                  label: '删除',
+                  onTap: () => DownloadManager.instance.remove(task),
+                ),
+              ],
             ),
         ],
       ),
@@ -470,7 +495,14 @@ class _UploadRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          FileTile(type: 0, name: task.name, size: 44),
+          UriThumb(
+            uri: task.uri,
+            name: task.name,
+            size: 44,
+            // 只有上传完成后服务端才有真实内容，上传中取缩略图会拿到
+            // 空占位并污染缓存，因此完成前只显示类型图标
+            available: ok,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -520,12 +552,17 @@ class _UploadRow extends StatelessWidget {
                   Text(
                     ok
                         ? '上传完成'
-                        : task.status == UploadStatus.cancelled
-                            ? '已取消'
+                        : task.status == UploadStatus.paused
+                            ? _pausedLabel(
+                                task.transferredBytes, task.size)
                             : '上传失败：${task.error ?? '未知错误'}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: ok ? AppColors.ink3 : AppColors.danger,
+                      // 暂停不是错误：用中性灰，只有真正失败才用红色
+                      color:
+                          ok || task.status == UploadStatus.paused
+                              ? AppColors.ink3
+                              : AppColors.danger,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -546,8 +583,10 @@ class _UploadRow extends StatelessWidget {
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-                const SizedBox(width: 6),
-                _CancelButton(
+                const SizedBox(width: 8),
+                _TaskActionButton(
+                  icon: Icons.pause,
+                  label: '暂停',
                   onTap: () => UploadManager.instance.cancel(task),
                 ),
               ],
@@ -555,8 +594,22 @@ class _UploadRow extends StatelessWidget {
           else if (ok)
             const Icon(Icons.check_circle, size: 22, color: AppColors.success)
           else
-            _RetryButton(
-              onTap: () => UploadManager.instance.retry(task),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _TaskActionButton(
+                  icon: Icons.play_arrow,
+                  label: '继续',
+                  primary: true,
+                  onTap: () => UploadManager.instance.retry(task),
+                ),
+                const SizedBox(width: 6),
+                _TaskActionButton(
+                  icon: Icons.delete_outline,
+                  label: '删除',
+                  onTap: () => UploadManager.instance.remove(task),
+                ),
+              ],
             ),
         ],
       ),
@@ -564,47 +617,57 @@ class _UploadRow extends StatelessWidget {
   }
 }
 
-/// 取消按钮（进行中任务）
-class _CancelButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _CancelButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.line),
-        ),
-        child: Icon(Icons.close, size: 18, color: AppColors.ink3),
-      ),
-    );
+/// 暂停状态文案：显示已完成进度，让用户判断继续是否值得。
+/// 例：「已暂停 12.3 MB / 109.0 MB」
+String _pausedLabel(int transferred, int total) {
+  if (total > 0) {
+    return '已暂停 ${formatBytes(transferred)} / ${formatBytes(total)}';
   }
+  return transferred > 0
+      ? '已暂停 ${formatBytes(transferred)}'
+      : '已暂停';
 }
 
-/// 重试按钮（失败 / 已取消任务）
-class _RetryButton extends StatelessWidget {
+/// 任务操作按钮（暂停 / 继续 / 删除）
+///
+/// 纯图标 + Tooltip：文字标签在窄屏任务行里容易挤压文件名，
+/// 可发现性由 tooltip 与图标本身的通用语义承载。
+class _TaskActionButton extends StatelessWidget {
+  final IconData icon;
+
+  /// 无障碍与长按提示文案（不渲染在按钮上）
+  final String label;
   final VoidCallback onTap;
 
-  const _RetryButton({required this.onTap});
+  /// 主操作（「继续」）用品牌色突出
+  final bool primary;
+
+  const _TaskActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.line),
+    final color = primary ? AppColors.primary : AppColors.ink2;
+    return Tooltip(
+      message: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: primary ? AppColors.primarySoft : Colors.transparent,
+            border: Border.all(
+              color: primary ? AppColors.primarySoft : AppColors.line,
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 17, color: color),
         ),
-        child: Icon(Icons.refresh, size: 18, color: AppColors.primary),
       ),
     );
   }

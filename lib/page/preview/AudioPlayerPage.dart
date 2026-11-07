@@ -63,7 +63,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     for (final f in items) {
       try {
         final url = await FileApi.getDownloadUrl(f.path);
-        DownloadManager.instance.startDownload(f.name, url);
+        DownloadManager.instance.startDownload(f.name, url, sourceUri: f.path);
         count++;
       } catch (_) {}
     }
